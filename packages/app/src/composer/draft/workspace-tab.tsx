@@ -8,6 +8,7 @@ import { useContainerWidthBelow } from "@/hooks/use-container-width";
 import invariant from "tiny-invariant";
 import { Composer } from "@/composer";
 import { DraftAgentModeControl } from "@/composer/agent-controls/mode-control";
+import { ComposerArchivedSessionsPill } from "@/composer/draft/archived-pill";
 import { ComposerImportPill } from "@/composer/draft/import-pill";
 import { FileDropZone } from "@/components/file-drop-zone";
 import { AgentStreamView } from "@/agent-stream/view";
@@ -286,6 +287,8 @@ interface WorkspaceDraftAgentTabProps {
   onCreated: (snapshot: AgentSnapshotPayload) => void;
   onOpenWorkspaceFile: (request: WorkspaceFileOpenRequest) => void;
   onOpenImportSheet?: () => void;
+  onOpenArchivedSheet?: () => void;
+  archivedSessionCount?: number;
 }
 
 function resolveImportPillPress(
@@ -298,6 +301,43 @@ function resolveImportPillPress(
   return onOpenImportSheet ?? null;
 }
 
+function resolveArchivedPillPress(
+  onOpenArchivedSheet: (() => void) | undefined,
+  archivedSessionCount: number,
+  isSubmitting: boolean,
+): (() => void) | null {
+  if (isSubmitting || archivedSessionCount <= 0) {
+    return null;
+  }
+  return onOpenArchivedSheet ?? null;
+}
+
+interface DraftComposerPillRowProps {
+  importPillPress: (() => void) | null;
+  archivedPillPress: (() => void) | null;
+  archivedSessionCount: number;
+}
+
+function DraftComposerPillRow({
+  importPillPress,
+  archivedPillPress,
+  archivedSessionCount,
+}: DraftComposerPillRowProps) {
+  if (!importPillPress && !archivedPillPress) {
+    return null;
+  }
+  return (
+    <View style={styles.importPillRow}>
+      <View style={styles.importPillContent}>
+        {importPillPress ? <ComposerImportPill onPress={importPillPress} /> : null}
+        {archivedPillPress ? (
+          <ComposerArchivedSessionsPill count={archivedSessionCount} onPress={archivedPillPress} />
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
 export function WorkspaceDraftAgentTab({
   serverId,
   workspaceId,
@@ -308,6 +348,8 @@ export function WorkspaceDraftAgentTab({
   onCreated,
   onOpenWorkspaceFile,
   onOpenImportSheet,
+  onOpenArchivedSheet,
+  archivedSessionCount = 0,
 }: WorkspaceDraftAgentTabProps) {
   const insets = useSafeAreaInsets();
   const client = useHostRuntimeClient(serverId);
@@ -608,6 +650,11 @@ export function WorkspaceDraftAgentTab({
     focusInputRef.current?.();
   }, []);
   const importPillPress = resolveImportPillPress(onOpenImportSheet, isSubmitting);
+  const archivedPillPress = resolveArchivedPillPress(
+    onOpenArchivedSheet,
+    archivedSessionCount,
+    isSubmitting,
+  );
   const composerAgentControls = useMemo(
     () => ({
       ...composerState.agentControls,
@@ -676,13 +723,11 @@ export function WorkspaceDraftAgentTab({
         </View>
 
         <ReanimatedAnimated.View style={inputAreaWrapperStyle} onLayout={onInputAreaLayout}>
-          {importPillPress ? (
-            <View style={styles.importPillRow}>
-              <View style={styles.importPillContent}>
-                <ComposerImportPill onPress={importPillPress} />
-              </View>
-            </View>
-          ) : null}
+          <DraftComposerPillRow
+            importPillPress={importPillPress}
+            archivedPillPress={archivedPillPress}
+            archivedSessionCount={archivedSessionCount}
+          />
           <Composer
             agentId={tabId}
             serverId={serverId}
@@ -751,6 +796,8 @@ const styles = StyleSheet.create((theme) => ({
     width: "100%",
     maxWidth: MAX_CONTENT_WIDTH,
     flexDirection: "row",
+    gap: theme.spacing[2],
+    flexWrap: "wrap",
   },
   errorContainer: {
     marginTop: theme.spacing[2],

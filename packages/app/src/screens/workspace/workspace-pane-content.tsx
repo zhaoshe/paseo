@@ -28,6 +28,8 @@ export interface BuildWorkspacePaneContentModelInput {
   onRetargetCurrentTab: (target: WorkspaceTabDescriptor["target"]) => void;
   onOpenWorkspaceFile: (request: WorkspaceFileOpenRequest) => void;
   onOpenImportSheet: () => void;
+  onOpenArchivedSheet: () => void;
+  archivedSessionCount: number;
 }
 
 export function buildWorkspacePaneContentModel({
@@ -39,6 +41,8 @@ export function buildWorkspacePaneContentModel({
   onRetargetCurrentTab,
   onOpenWorkspaceFile,
   onOpenImportSheet,
+  onOpenArchivedSheet,
+  archivedSessionCount,
 }: BuildWorkspacePaneContentModelInput): WorkspacePaneContentModel {
   ensurePanelsRegistered();
   const registration = getPanelRegistration(tab.kind);
@@ -56,6 +60,8 @@ export function buildWorkspacePaneContentModel({
       retargetCurrentTab: onRetargetCurrentTab,
       openFileInWorkspace: onOpenWorkspaceFile,
       openImportSheet: onOpenImportSheet,
+      openArchivedSheet: onOpenArchivedSheet,
+      archivedSessionCount,
     },
   };
 }
@@ -79,7 +85,9 @@ export function WorkspacePaneContent({
   const retargetCurrentTab = useStableEvent(paneContextValue.retargetCurrentTab);
   const openFileInWorkspace = useStableEvent(paneContextValue.openFileInWorkspace);
   const openImportSheet = useStableEvent(paneContextValue.openImportSheet);
-  const stablePaneContextValue = useMemo(
+  const openArchivedSheet = useStableEvent(paneContextValue.openArchivedSheet);
+  const archivedSessionCount = paneContextValue.archivedSessionCount;
+  const stablePaneContextValue: PaneContextValue = useMemo(
     () => ({
       serverId: paneContextValue.serverId,
       workspaceId: paneContextValue.workspaceId,
@@ -90,9 +98,13 @@ export function WorkspacePaneContent({
       retargetCurrentTab,
       openFileInWorkspace,
       openImportSheet,
+      openArchivedSheet,
+      archivedSessionCount,
     }),
     [
+      archivedSessionCount,
       closeCurrentTab,
+      openArchivedSheet,
       openFileInWorkspace,
       openImportSheet,
       openTab,
