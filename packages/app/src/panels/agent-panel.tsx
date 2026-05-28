@@ -320,6 +320,8 @@ function DraftPanel() {
     target,
     openFileInWorkspace,
     openImportSheet,
+    openArchivedSheet,
+    archivedSessionCount,
     retargetCurrentTab,
   } = usePaneContext();
   const { isInteractive } = usePaneFocus();
@@ -349,6 +351,8 @@ function DraftPanel() {
       onOpenWorkspaceFile={openFileInWorkspace}
       onCreated={handleCreated}
       onOpenImportSheet={openImportSheet}
+      onOpenArchivedSheet={openArchivedSheet}
+      archivedSessionCount={archivedSessionCount}
     />
   );
 }

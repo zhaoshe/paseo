@@ -64,7 +64,12 @@ import { SourceControlPanelIcon } from "@/components/icons/source-control-panel-
 import { WorkspaceGitActions } from "@/git/workspace-actions";
 import { WorkspaceOpenInEditorButton } from "@/screens/workspace/workspace-open-in-editor-button";
 import { WorkspaceScriptsButton } from "@/screens/workspace/workspace-scripts-button";
+import {
+  ArchivedSessionsSheet,
+  selectArchivedAgentsForCwd,
+} from "@/components/archived-sessions-sheet";
 import { ImportSessionSheet } from "@/components/import-session-sheet";
+import { useAgentHistory } from "@/hooks/use-agent-history";
 import { ExplorerSidebarAnimationProvider } from "@/contexts/explorer-sidebar-animation-context";
 import { useToast } from "@/contexts/toast-context";
 import { useExplorerOpenGesture } from "@/hooks/use-explorer-open-gesture";
@@ -1664,6 +1669,21 @@ function WorkspaceScreenContent({
   const closeImportSheet = useCallback(() => {
     setIsImportSheetVisible(false);
   }, []);
+  const [isArchivedSheetVisible, setIsArchivedSheetVisible] = useState(false);
+  const openArchivedSheet = useCallback(() => {
+    setIsArchivedSheetVisible(true);
+  }, []);
+  const closeArchivedSheet = useCallback(() => {
+    setIsArchivedSheetVisible(false);
+  }, []);
+  const { agents: agentHistoryAgents } = useAgentHistory({
+    serverId: normalizedServerId,
+    enabled: isRouteFocused,
+  });
+  const archivedSessionCount = useMemo(
+    () => selectArchivedAgentsForCwd(agentHistoryAgents, workspaceDirectory).length,
+    [agentHistoryAgents, workspaceDirectory],
+  );
 
   // Warm the workspace-scoped provider snapshot so the model picker is ready when opened.
   useProvidersSnapshot(normalizedServerId, {
@@ -3065,14 +3085,18 @@ function WorkspaceScreenContent({
           });
         },
         onOpenImportSheet: openImportSheet,
+        onOpenArchivedSheet: openArchivedSheet,
+        archivedSessionCount,
       }),
     [
+      archivedSessionCount,
       handleCloseTabById,
       focusWorkspacePane,
       handleOpenWorkspaceFileFromPane,
       navigateToTabId,
       normalizedServerId,
       normalizedWorkspaceId,
+      openArchivedSheet,
       openImportSheet,
       openWorkspaceChildTabFocused,
       persistenceKey,
@@ -3624,6 +3648,13 @@ function WorkspaceScreenContent({
               cwd={workspaceDirectory}
               onClose={closeImportSheet}
               onImportedAgent={handleImportedAgent}
+            />
+            <ArchivedSessionsSheet
+              visible={isArchivedSheetVisible}
+              serverId={normalizedServerId}
+              cwd={workspaceDirectory}
+              onClose={closeArchivedSheet}
+              onUnarchivedAgent={handleImportedAgent}
             />
             <WorkspaceTabRenameModal
               renamingTab={renamingTab}
