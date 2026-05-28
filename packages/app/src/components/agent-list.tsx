@@ -15,7 +15,7 @@ import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { formatTimeAgo } from "@/utils/time";
-import { shortenPath } from "@/utils/shorten-path";
+import { shortenPathTail } from "@/utils/shorten-path";
 import { type AggregatedAgent } from "@/hooks/use-aggregated-agents";
 import { useSessionStore } from "@/stores/session-store";
 import { Archive } from "lucide-react-native";
@@ -220,7 +220,11 @@ function SessionRow({
   const agentKey = `${agent.serverId}:${agent.id}`;
   const isSelected = selectedAgentId === agentKey;
   const statusLabel = formatStatusLabel(t, agent.status);
-  const projectPath = shortenPath(agent.cwd);
+  // Compact rows: keep the meaningful tail of the cwd (project / worktree name)
+  // visible by dropping the head with an ellipsis when the path is long. Char
+  // budgets target the actual column width so the default CSS tail-truncation
+  // doesn't kick in and chop the tail off again on web.
+  const projectPath = shortenPathTail(agent.cwd, isMobile ? 50 : 26);
   const ProviderIcon = getProviderIcon(agent.provider);
   const pendingPermissionCount = agent.pendingPermissionCount ?? 0;
 
