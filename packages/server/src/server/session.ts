@@ -121,7 +121,9 @@ import {
   emitLiveTimelineItemIfAgentKnown,
 } from "./agent/timeline-append.js";
 import {
+  projectTimelineRows,
   selectProjectedTimelinePage,
+  type TimelineProjectionEntry,
   type TimelineProjectionMode,
 } from "./agent/timeline-projection.js";
 import {
@@ -567,6 +569,7 @@ export interface SessionOptions {
   downloadTokenStore: DownloadTokenStore;
   pushTokenStore: PushTokenStore;
   paseoHome: string;
+  worktreesRoot?: string;
   agentManager: AgentManager;
   agentStorage: AgentStorage;
   projectRegistry: ProjectRegistry;
@@ -716,6 +719,15 @@ function parseClientCapabilities(
   return new Set(result);
 }
 
+interface AgentTimelineProjectionSelection {
+  timeline: AgentTimelineFetchResult;
+  entries: TimelineProjectionEntry[];
+  startSeq: number | null;
+  endSeq: number | null;
+  hasOlder: boolean;
+  hasNewer: boolean;
+}
+
 /**
  * Session represents a single connected client session.
  * It owns all state management, orchestration logic, and message processing.
@@ -731,6 +743,7 @@ export class Session {
   private readonly onLifecycleIntent: ((intent: SessionLifecycleIntent) => void) | null;
   private readonly sessionLogger: pino.Logger;
   private readonly paseoHome: string;
+  private readonly worktreesRoot: string | undefined;
 
   // State machine
   private abortController: AbortController;
@@ -848,6 +861,7 @@ export class Session {
       downloadTokenStore,
       pushTokenStore,
       paseoHome,
+      worktreesRoot,
       agentManager,
       agentStorage,
       projectRegistry,
@@ -889,6 +903,7 @@ export class Session {
     this.downloadTokenStore = downloadTokenStore;
     this.pushTokenStore = pushTokenStore;
     this.paseoHome = paseoHome;
+    this.worktreesRoot = worktreesRoot;
     this.sessionLogger = logger.child({
       module: "session",
       clientId: this.clientId,
@@ -919,6 +934,7 @@ export class Session {
     });
     this.createAgentLifecycleDispatch = new CreateAgentLifecycleDispatch({
       paseoHome: this.paseoHome,
+      worktreesRoot: this.worktreesRoot,
       agentManager: this.agentManager,
       agentStorage: this.agentStorage,
       github: this.github,
@@ -3100,6 +3116,7 @@ export class Session {
           agentStorage: this.agentStorage,
           logger: this.sessionLogger,
           paseoHome: this.paseoHome,
+          worktreesRoot: this.worktreesRoot,
           workspaceGitService: this.workspaceGitService,
           providerSnapshotManager: this.providerSnapshotManager,
           daemonConfig: this.readStructuredGenerationDaemonConfig(),
@@ -3480,6 +3497,7 @@ export class Session {
     return buildWorktreeAgentSessionConfig(
       {
         paseoHome: this.paseoHome,
+        worktreesRoot: this.worktreesRoot,
         sessionLogger: this.sessionLogger,
         workspaceGitService: this.workspaceGitService,
         createPaseoWorktree: (input, serviceOptions) =>
@@ -5219,7 +5237,7 @@ export class Session {
           baseRef,
           mode: msg.strategy === "squash" ? "squash" : "merge",
         },
-        { paseoHome: this.paseoHome },
+        { paseoHome: this.paseoHome, worktreesRoot: this.worktreesRoot },
       );
       await Promise.all([
         this.notifyGitMutation(mutatedCwd, "merge-to-base", { invalidateGithub: true }),
@@ -5700,6 +5718,7 @@ export class Session {
     return handleWorktreeArchiveRequest(
       {
         paseoHome: this.paseoHome,
+        worktreesRoot: this.worktreesRoot,
         github: this.github,
         workspaceGitService: this.workspaceGitService,
         agentManager: this.agentManager,
@@ -7287,6 +7306,7 @@ export class Session {
     return handleCreateWorktreeRequest(
       {
         paseoHome: this.paseoHome,
+        worktreesRoot: this.worktreesRoot,
         describeWorkspaceRecord: (result) => this.describeCreatedWorktreeWorkspace(result),
         emit: (message) => this.emit(message),
         sessionLogger: this.sessionLogger,
@@ -7306,6 +7326,7 @@ export class Session {
     return createWorktreeWorkflow(
       {
         paseoHome: this.paseoHome,
+        worktreesRoot: this.worktreesRoot,
         createPaseoWorktree: (workflowInput, serviceOptions) =>
           this.createPaseoWorktree(workflowInput, serviceOptions),
         warmWorkspaceGitData: (workspace) => this.warmWorkspaceGitDataForWorkspace(workspace),
@@ -7437,11 +7458,70 @@ export class Session {
     return timeline.rows.some((row) => row.item.type === "tool_call");
   }
 
+  private selectCanonicalTimelineProjection(input: {
+    timeline: AgentTimelineFetchResult;
+  }): AgentTimelineProjectionSelection {
+    const entries = projectTimelineRows({ rows: input.timeline.rows, mode: "canonical" });
+    return {
+      timeline: input.timeline,
+      entries,
+      startSeq: entries[0]?.seqStart ?? null,
+      endSeq: entries[entries.length - 1]?.seqEnd ?? null,
+      hasOlder: input.timeline.hasOlder,
+      hasNewer: input.timeline.hasNewer,
+    };
+  }
+
+  private selectProjectedTimelineProjection(input: {
+    agentId: string;
+    controlTimeline: AgentTimelineFetchResult;
+    direction: AgentTimelineFetchDirection;
+    cursor?: AgentTimelineCursor;
+    pageLimit: number;
+  }): AgentTimelineProjectionSelection {
+    const timeline = this.shouldUseFullTimelineForProjectedPage({
+      timeline: input.controlTimeline,
+    })
+      ? this.agentManager.fetchTimeline(input.agentId, { direction: "tail", limit: 0 })
+      : input.controlTimeline;
+    const page = selectProjectedTimelinePage({
+      rows: timeline.rows,
+      bounds: timeline.window,
+      direction: input.controlTimeline.reset ? "tail" : input.direction,
+      ...(input.cursor ? { cursorSeq: input.cursor.seq } : {}),
+      limit: input.pageLimit,
+    });
+
+    return {
+      timeline,
+      entries: page.entries,
+      startSeq: page.startSeq,
+      endSeq: page.endSeq,
+      hasOlder: page.hasOlder || (page.startSeq !== null && page.startSeq > timeline.window.minSeq),
+      hasNewer: page.hasNewer,
+    };
+  }
+
+  private selectTimelineProjection(input: {
+    agentId: string;
+    projection: TimelineProjectionMode;
+    controlTimeline: AgentTimelineFetchResult;
+    direction: AgentTimelineFetchDirection;
+    cursor?: AgentTimelineCursor;
+    pageLimit: number;
+  }): AgentTimelineProjectionSelection {
+    if (input.projection === "canonical") {
+      return this.selectCanonicalTimelineProjection({ timeline: input.controlTimeline });
+    }
+
+    return this.selectProjectedTimelineProjection(input);
+  }
+
   private async handleFetchAgentTimelineRequest(
     msg: Extract<SessionInboundMessage, { type: "fetch_agent_timeline_request" }>,
   ): Promise<void> {
     const direction: AgentTimelineFetchDirection = msg.direction ?? (msg.cursor ? "after" : "tail");
-    const projection: TimelineProjectionMode = "projected";
+    const projection: TimelineProjectionMode = msg.projection ?? "projected";
     const requestedLimit = msg.limit;
     const pageLimit = requestedLimit ?? (direction === "after" ? 0 : 200);
     const cursor: AgentTimelineCursor | undefined = msg.cursor
@@ -7464,24 +7544,22 @@ export class Session {
         cursor,
         limit: pageLimit,
       });
-      const timeline = this.shouldUseFullTimelineForProjectedPage({
-        timeline: controlTimeline,
-      })
-        ? this.agentManager.fetchTimeline(msg.agentId, { direction: "tail", limit: 0 })
-        : controlTimeline;
-      const projectedPage = selectProjectedTimelinePage({
-        rows: timeline.rows,
-        bounds: timeline.window,
-        direction: controlTimeline.reset ? "tail" : direction,
-        ...(cursor ? { cursorSeq: cursor.seq } : {}),
-        limit: pageLimit,
+      const selectedTimeline = this.selectTimelineProjection({
+        agentId: msg.agentId,
+        projection,
+        controlTimeline,
+        direction,
+        ...(cursor ? { cursor } : {}),
+        pageLimit,
       });
       const startCursor =
-        projectedPage.startSeq !== null
-          ? { epoch: timeline.epoch, seq: projectedPage.startSeq }
+        selectedTimeline.startSeq !== null
+          ? { epoch: selectedTimeline.timeline.epoch, seq: selectedTimeline.startSeq }
           : null;
       const endCursor =
-        projectedPage.endSeq !== null ? { epoch: timeline.epoch, seq: projectedPage.endSeq } : null;
+        selectedTimeline.endSeq !== null
+          ? { epoch: selectedTimeline.timeline.epoch, seq: selectedTimeline.endSeq }
+          : null;
 
       this.emit({
         type: "fetch_agent_timeline_response",
@@ -7491,18 +7569,16 @@ export class Session {
           agent: agentPayload,
           direction,
           projection,
-          epoch: timeline.epoch,
+          epoch: selectedTimeline.timeline.epoch,
           reset: controlTimeline.reset,
           staleCursor: controlTimeline.staleCursor,
           gap: controlTimeline.gap,
-          window: timeline.window,
+          window: selectedTimeline.timeline.window,
           startCursor,
           endCursor,
-          hasOlder:
-            projectedPage.hasOlder ||
-            (projectedPage.startSeq !== null && projectedPage.startSeq > timeline.window.minSeq),
-          hasNewer: projectedPage.hasNewer,
-          entries: projectedPage.entries.map((entry) => ({
+          hasOlder: selectedTimeline.hasOlder,
+          hasNewer: selectedTimeline.hasNewer,
+          entries: selectedTimeline.entries.map((entry) => ({
             provider: snapshot.provider,
             item: entry.item,
             timestamp: entry.timestamp,
