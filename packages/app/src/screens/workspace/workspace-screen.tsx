@@ -182,6 +182,7 @@ import {
   type WorkspaceFileLocation,
   type WorkspaceFileOpenRequest,
 } from "@/workspace/file-open";
+import { RenderProfile } from "@/utils/render-profiler";
 
 const WORKSPACE_SETUP_AUTO_OPEN_WINDOW_MS = 30_000;
 const WORKSPACE_FLOATING_PANEL_PORTAL_HOST_PREFIX = "workspace-floating-panels";
@@ -739,15 +740,42 @@ const MobileMountedTabSlot = memo(function MobileMountedTabSlot({
     : styles.mobileMountedTabSlotHidden;
 
   return (
-    <View style={slotStyle} pointerEvents={isVisible ? "auto" : "none"}>
-      <WorkspacePaneContent
-        content={content}
-        isWorkspaceFocused={isWorkspaceFocused}
-        isPaneFocused={isPaneFocused}
-      />
-    </View>
+    <RenderProfile id={`MobileMountedTabSlot:${tabDescriptor.kind}:${tabDescriptor.tabId}`}>
+      <View style={slotStyle} pointerEvents={isVisible ? "auto" : "none"}>
+        <WorkspacePaneContent
+          content={content}
+          isWorkspaceFocused={isWorkspaceFocused}
+          isPaneFocused={isPaneFocused}
+        />
+      </View>
+    </RenderProfile>
   );
 });
+
+interface MobileExplorerOpenGestureSurfaceProps {
+  children: ReactNode;
+  onOpenExplorer: () => void;
+}
+
+function MobileExplorerOpenGestureSurface({
+  children,
+  onOpenExplorer,
+}: MobileExplorerOpenGestureSurfaceProps) {
+  const canOpenExplorerFromAgentView = usePanelStore(
+    (state) =>
+      state.mobileView === "agent" && !selectIsFileExplorerOpen(state, { isCompact: true }),
+  );
+  const explorerOpenGesture = useExplorerOpenGesture({
+    enabled: canOpenExplorerFromAgentView,
+    onOpen: onOpenExplorer,
+  });
+
+  return (
+    <GestureDetector gesture={explorerOpenGesture} touchAction={COMPACT_WEB_GESTURE_TOUCH_ACTION}>
+      <View style={styles.content}>{children}</View>
+    </GestureDetector>
+  );
+}
 
 function useStableTabDescriptorMap(tabDescriptors: WorkspaceTabDescriptor[]) {
   const cacheRef = useRef(new Map<string, WorkspaceTabDescriptor>());
@@ -775,7 +803,11 @@ function useStableTabDescriptorMap(tabDescriptors: WorkspaceTabDescriptor[]) {
   return tabDescriptorMap;
 }
 
-export function WorkspaceScreen({ serverId, workspaceId, isRouteFocused }: WorkspaceScreenProps) {
+export const WorkspaceScreen = memo(function WorkspaceScreen({
+  serverId,
+  workspaceId,
+  isRouteFocused,
+}: WorkspaceScreenProps) {
   const navigationFocused = useIsFocused();
   const effectiveRouteFocused = isRouteFocused ?? navigationFocused;
 
@@ -788,7 +820,7 @@ export function WorkspaceScreen({ serverId, workspaceId, isRouteFocused }: Works
       />
     </ExplorerSidebarAnimationProvider>
   );
-}
+});
 
 interface UseCloseTabsResult {
   closingTabIds: Set<string>;
@@ -1677,10 +1709,6 @@ function WorkspaceScreenContent({
   const isExplorerOpen = usePanelStore((state) =>
     selectIsFileExplorerOpen(state, { isCompact: isMobile }),
   );
-  const canOpenExplorerFromAgentView = usePanelStore(
-    (state) =>
-      state.mobileView === "agent" && !selectIsFileExplorerOpen(state, { isCompact: true }),
-  );
   const openFileExplorerForCheckout = usePanelStore((state) => state.openFileExplorerForCheckout);
   const toggleFileExplorerForCheckout = usePanelStore(
     (state) => state.toggleFileExplorerForCheckout,
@@ -1731,11 +1759,6 @@ function WorkspaceScreenContent({
     () => ({ expanded: isExplorerOpen }),
     [isExplorerOpen],
   );
-
-  const explorerOpenGesture = useExplorerOpenGesture({
-    enabled: isMobile && canOpenExplorerFromAgentView,
-    onOpen: openExplorerForWorkspace,
-  });
 
   useEffect(() => {
     if (!isRouteFocused || isWeb || !isExplorerOpen) {
@@ -2198,7 +2221,31 @@ function WorkspaceScreenContent({
     ],
   );
 
-  const [_hoveredTabKey, setHoveredTabKey] = useState<string | null>(null);
+  const handleOpenWorkspaceFileFromPane = useStableEvent(function handleOpenWorkspaceFileFromPane({
+    request,
+    paneId,
+    parentTabId,
+    focusPaneBeforeOpen,
+  }: {
+    request: WorkspaceFileOpenRequest;
+    paneId?: string | null;
+    parentTabId: string;
+    focusPaneBeforeOpen?: boolean;
+  }) {
+    if (focusPaneBeforeOpen && paneId && persistenceKey) {
+      focusWorkspacePane(persistenceKey, paneId);
+    }
+    if (request.disposition === "side") {
+      handleOpenFileFromChatInSidePane({
+        location: request.location,
+        sourcePaneId: paneId ?? undefined,
+        parentTabId,
+      });
+      return;
+    }
+    handleOpenFileFromChat(request.location, { parentTabId });
+  });
+
   const [hoveredCloseTabKey, setHoveredCloseTabKey] = useState<string | null>(null);
   const { handleRenameTab, renamingTab, handleRenameModalSubmit, handleRenameModalClose } =
     useWorkspaceTabRename({
@@ -2320,7 +2367,6 @@ function WorkspaceScreenContent({
         }
 
         removeTerminalFromCache(terminalId);
-        setHoveredTabKey((current) => (current === tabId ? null : current));
         setHoveredCloseTabKey((current) => (current === tabId ? null : current));
         if (persistenceKey) {
           closeWorkspaceTabWithCleanup({
@@ -2369,7 +2415,6 @@ function WorkspaceScreenContent({
           }
         }
 
-        setHoveredTabKey((current) => (current === tabId ? null : current));
         setHoveredCloseTabKey((current) => (current === tabId ? null : current));
         if (persistenceKey) {
           closeWorkspaceTabWithCleanup({
@@ -2394,7 +2439,6 @@ function WorkspaceScreenContent({
       tabId: string;
       target?: WorkspaceTabTarget | null;
     }) {
-      setHoveredTabKey((current) => (current === input.tabId ? null : current));
       setHoveredCloseTabKey((current) => (current === input.tabId ? null : current));
       if (persistenceKey) {
         closeWorkspaceTabWithCleanup({ tabId: input.tabId, target: input.target });
@@ -2485,7 +2529,7 @@ function WorkspaceScreenContent({
         const currentCursor = sessionState?.agentTimelineCursor.get(agentId);
         await client.fetchAgentTimeline(agentId, {
           direction: "tail",
-          projection: "canonical",
+          projection: "projected",
           ...(currentCursor
             ? { cursor: { epoch: currentCursor.epoch, seq: currentCursor.endSeq } }
             : {}),
@@ -2576,7 +2620,6 @@ function WorkspaceScreenContent({
       });
 
       const closedKeys = new Set(tabsToClose.map((tab) => tab.key));
-      setHoveredTabKey((current) => (current && closedKeys.has(current) ? null : current));
       setHoveredCloseTabKey((current) => (current && closedKeys.has(current) ? null : current));
     },
     [client, closeTab, closeWorkspaceTabWithCleanup, persistenceKey],
@@ -2871,18 +2914,12 @@ function WorkspaceScreenContent({
           retargetWorkspaceTab(persistenceKey, input.tab.tabId, target);
         },
         onOpenWorkspaceFile: (request: WorkspaceFileOpenRequest) => {
-          if (input.focusPaneBeforeOpen && input.paneId && persistenceKey) {
-            focusWorkspacePane(persistenceKey, input.paneId);
-          }
-          if (request.disposition === "side") {
-            handleOpenFileFromChatInSidePane({
-              location: request.location,
-              sourcePaneId: input.paneId ?? undefined,
-              parentTabId: input.tab.tabId,
-            });
-            return;
-          }
-          handleOpenFileFromChat(request.location, { parentTabId: input.tab.tabId });
+          handleOpenWorkspaceFileFromPane({
+            request,
+            paneId: input.paneId,
+            parentTabId: input.tab.tabId,
+            focusPaneBeforeOpen: input.focusPaneBeforeOpen,
+          });
         },
         onOpenImportSheet: openImportSheet,
         onOpenArchivedSheet: openArchivedSheet,
@@ -2891,9 +2928,8 @@ function WorkspaceScreenContent({
     [
       archivedSessionCount,
       handleCloseTabById,
-      handleOpenFileFromChat,
-      handleOpenFileFromChatInSidePane,
       focusWorkspacePane,
+      handleOpenWorkspaceFileFromPane,
       navigateToTabId,
       normalizedServerId,
       normalizedWorkspaceId,
@@ -3217,9 +3253,9 @@ function WorkspaceScreenContent({
       `${WORKSPACE_FLOATING_PANEL_PORTAL_HOST_PREFIX}:${normalizedServerId}:${normalizedWorkspaceId}`,
     [normalizedServerId, normalizedWorkspaceId],
   );
-  const desktopContent = useMemo(() => {
+  const desktopSplitContent = useMemo(() => {
     if (!canRenderDesktopPaneSplits || !workspaceLayout || !persistenceKey) {
-      return content;
+      return null;
     }
     return (
       <SplitContainer
@@ -3231,7 +3267,6 @@ function WorkspaceScreenContent({
         isWorkspaceFocused={isRouteFocused}
         uiTabs={uiTabs}
         hoveredCloseTabKey={hoveredCloseTabKey}
-        setHoveredTabKey={setHoveredTabKey}
         setHoveredCloseTabKey={setHoveredCloseTabKey}
         closingTabIds={closingTabIds}
         onNavigateTab={navigateToTabId}
@@ -3258,7 +3293,6 @@ function WorkspaceScreenContent({
       />
     );
   }, [
-    content,
     canRenderDesktopPaneSplits,
     workspaceLayout,
     persistenceKey,
@@ -3291,6 +3325,7 @@ function WorkspaceScreenContent({
     handleReorderTabsInPane,
     renderSplitPaneEmptyState,
   ]);
+  const desktopContent = desktopSplitContent ?? content;
 
   const workspaceCenterColumn = (
     <View style={styles.centerColumn}>
@@ -3367,7 +3402,6 @@ function WorkspaceScreenContent({
           tabs={desktopTabRowItems}
           normalizedServerId={normalizedServerId}
           normalizedWorkspaceId={normalizedWorkspaceId}
-          setHoveredTabKey={setHoveredTabKey}
           setHoveredCloseTabKey={setHoveredCloseTabKey}
           onNavigateTab={navigateToTabId}
           onCloseTab={handleCloseTabById}
@@ -3393,12 +3427,9 @@ function WorkspaceScreenContent({
 
       <View style={styles.centerContent}>
         {isMobile ? (
-          <GestureDetector
-            gesture={explorerOpenGesture}
-            touchAction={COMPACT_WEB_GESTURE_TOUCH_ACTION}
-          >
-            <View style={styles.content}>{content}</View>
-          </GestureDetector>
+          <MobileExplorerOpenGestureSurface onOpenExplorer={openExplorerForWorkspace}>
+            {content}
+          </MobileExplorerOpenGestureSurface>
         ) : (
           <View style={styles.content}>{desktopContent}</View>
         )}
@@ -3409,51 +3440,53 @@ function WorkspaceScreenContent({
   return (
     gatedWorkspaceScreen ?? (
       <WorkspaceFocusProvider workspaceKey={persistenceKey}>
-        <View style={containerStyle}>
-          <WorkspaceDocumentTitleEffectSlot
-            tab={activeTabDescriptor}
-            serverId={normalizedServerId}
-            workspaceId={normalizedWorkspaceId}
-            isRouteFocused={isRouteFocused}
-          />
-          <View style={styles.threePaneRow}>
-            <FloatingPanelPortalHostNameProvider hostName={workspaceFloatingPanelPortalHostName}>
-              {workspaceCenterColumn}
-            </FloatingPanelPortalHostNameProvider>
+        <RenderProfile id="WorkspaceScreenContent">
+          <View style={containerStyle}>
+            <WorkspaceDocumentTitleEffectSlot
+              tab={activeTabDescriptor}
+              serverId={normalizedServerId}
+              workspaceId={normalizedWorkspaceId}
+              isRouteFocused={isRouteFocused}
+            />
+            <View style={styles.threePaneRow}>
+              <FloatingPanelPortalHostNameProvider hostName={workspaceFloatingPanelPortalHostName}>
+                {workspaceCenterColumn}
+              </FloatingPanelPortalHostNameProvider>
 
-            <FloatingPanelPortalHost name={workspaceFloatingPanelPortalHostName} />
+              <FloatingPanelPortalHost name={workspaceFloatingPanelPortalHostName} />
 
-            {showExplorerSidebar && workspaceDirectory ? (
-              <ExplorerSidebar
-                serverId={normalizedServerId}
-                workspaceId={normalizedWorkspaceId}
-                workspaceRoot={workspaceDirectory}
-                isGit={isGitCheckout}
-                onOpenFile={handleOpenFileFromExplorer}
-              />
-            ) : null}
+              {showExplorerSidebar && workspaceDirectory ? (
+                <ExplorerSidebar
+                  serverId={normalizedServerId}
+                  workspaceId={normalizedWorkspaceId}
+                  workspaceRoot={workspaceDirectory}
+                  isGit={isGitCheckout}
+                  onOpenFile={handleOpenFileFromExplorer}
+                />
+              ) : null}
+            </View>
+            <ImportSessionSheet
+              visible={isImportSheetVisible}
+              client={client}
+              serverId={normalizedServerId}
+              cwd={workspaceDirectory}
+              onClose={closeImportSheet}
+              onImportedAgent={handleImportedAgent}
+            />
+            <ArchivedSessionsSheet
+              visible={isArchivedSheetVisible}
+              serverId={normalizedServerId}
+              cwd={workspaceDirectory}
+              onClose={closeArchivedSheet}
+              onUnarchivedAgent={handleImportedAgent}
+            />
+            <WorkspaceTabRenameModal
+              renamingTab={renamingTab}
+              onSubmit={handleRenameModalSubmit}
+              onClose={handleRenameModalClose}
+            />
           </View>
-          <ImportSessionSheet
-            visible={isImportSheetVisible}
-            client={client}
-            serverId={normalizedServerId}
-            cwd={workspaceDirectory}
-            onClose={closeImportSheet}
-            onImportedAgent={handleImportedAgent}
-          />
-          <ArchivedSessionsSheet
-            visible={isArchivedSheetVisible}
-            serverId={normalizedServerId}
-            cwd={workspaceDirectory}
-            onClose={closeArchivedSheet}
-            onUnarchivedAgent={handleImportedAgent}
-          />
-          <WorkspaceTabRenameModal
-            renamingTab={renamingTab}
-            onSubmit={handleRenameModalSubmit}
-            onClose={handleRenameModalClose}
-          />
-        </View>
+        </RenderProfile>
       </WorkspaceFocusProvider>
     )
   );
