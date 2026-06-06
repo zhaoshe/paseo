@@ -11,7 +11,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import * as Haptics from "expo-haptics";
-import { useMutation, useQueries, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { slugify, validateBranchSlug, MAX_SLUG_LENGTH } from "@getpaseo/protocol/branch-slug";
 import { ProjectIconView } from "@/components/project-icon-view";
 import { AdaptiveRenameModal } from "@/components/rename-modal";
@@ -57,16 +57,16 @@ import {
 import { NestableScrollContainer } from "react-native-draggable-flatlist";
 import { DraggableList, type DraggableRenderItemInfo } from "./draggable-list";
 import type { DraggableListDragHandleProps } from "./draggable-list.types";
-import { getHostRuntimeStore, isHostRuntimeConnected } from "@/runtime/host-runtime";
+import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import { useIsCompactFormFactor } from "@/constants/layout";
-import { projectIconQueryKey, projectIconToDataUri } from "@/hooks/use-project-icon-query";
+import { useProjectIconDataByProjectKey } from "@/projects/project-icons";
 import {
   buildHostNewWorkspaceRoute,
   buildProjectSettingsRoute,
   parseHostWorkspaceRouteFromPathname,
 } from "@/utils/host-routes";
 import {
-  createSidebarWorkspaceEntry,
+  useSidebarWorkspaceEntry,
   type SidebarProjectEntry,
   type SidebarWorkspaceEntry,
 } from "@/hooks/use-sidebar-workspaces-list";
@@ -105,8 +105,8 @@ import {
   SidebarWorkspaceTrailingActionSlot,
 } from "@/components/sidebar/sidebar-workspace-row-content";
 import {
-  useHydratedWorkspaceEntries,
   useProjectNamesMap,
+  useStatusModeWorkspaceEntries,
 } from "@/hooks/use-status-mode-workspaces";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -117,8 +117,6 @@ import { useKeyboardActionHandler } from "@/hooks/use-keyboard-action-handler";
 import { useClearWorkspaceAttention } from "@/hooks/use-clear-workspace-attention";
 import type { PrHint } from "@/git/use-pr-status-query";
 import { buildSidebarProjectRowModel } from "@/utils/sidebar-project-row-model";
-import { useSessionStore, type WorkspaceDescriptor } from "@/stores/session-store";
-import { useWorkspaceFields } from "@/stores/session-store-hooks";
 import { redirectIfArchivingActiveWorkspace } from "@/utils/sidebar-workspace-archive-redirect";
 import { openExternalUrl } from "@/utils/open-external-url";
 import {
@@ -130,7 +128,12 @@ import {
   archiveWorkspaceOptimistically,
   archiveWorkspacesOptimistically,
 } from "@/workspace/workspace-archive";
-import { isWeb as platformIsWeb, isNative as platformIsNative } from "@/constants/platform";
+import {
+  isWeb as platformIsWeb,
+  isNative as platformIsNative,
+  getIsElectron,
+} from "@/constants/platform";
+import { getDesktopHost } from "@/desktop/host";
 
 const workspaceKeyExtractor = (workspace: SidebarWorkspaceEntry) => workspace.workspaceKey;
 
@@ -155,14 +158,24 @@ const ThemedCopy = withUnistyles(Copy);
 const ThemedArchive = withUnistyles(Archive);
 const ThemedPencil = withUnistyles(Pencil);
 
-const foregroundColorMapping = (theme: Theme) => ({ color: theme.colors.foreground });
+const foregroundColorMapping = (theme: Theme) => ({
+  color: theme.colors.foreground,
+});
 const foregroundMutedColorMapping = (theme: Theme) => ({
   color: theme.colors.foregroundMuted,
 });
-const redColorMapping = (theme: Theme) => ({ color: theme.colors.palette.red[500] });
-const amberColorMapping = (theme: Theme) => ({ color: theme.colors.palette.amber[500] });
-const greenColorMapping = (theme: Theme) => ({ color: theme.colors.palette.green[500] });
-const purpleColorMapping = (theme: Theme) => ({ color: theme.colors.palette.purple[500] });
+const redColorMapping = (theme: Theme) => ({
+  color: theme.colors.palette.red[500],
+});
+const amberColorMapping = (theme: Theme) => ({
+  color: theme.colors.palette.amber[500],
+});
+const greenColorMapping = (theme: Theme) => ({
+  color: theme.colors.palette.green[500],
+});
+const purpleColorMapping = (theme: Theme) => ({
+  color: theme.colors.palette.purple[500],
+});
 const syncedLoaderColorMapping = (theme: Theme) => ({
   color:
     theme.colorScheme === "light"
@@ -179,17 +192,6 @@ function getPrIconUniMapping(state: PrHint["state"]) {
     case "closed":
       return redColorMapping;
   }
-}
-
-function useStableProjectIconData(
-  data: (string | null)[],
-  signature: string,
-): readonly (string | null)[] {
-  const stableRef = useRef<{ signature: string; data: (string | null)[] } | null>(null);
-  if (stableRef.current?.signature !== signature) {
-    stableRef.current = { signature, data };
-  }
-  return stableRef.current.data;
 }
 
 function isWorkspaceSelected(input: {
@@ -218,6 +220,10 @@ function isProjectSelectedByRoute(input: {
       (workspace) => workspace.workspaceId === input.selection?.workspaceId,
     )
   );
+}
+
+function activeWorkspaceSelectionKey(selection: ActiveWorkspaceSelection | null): string {
+  return selection ? `${selection.serverId}:${selection.workspaceId}` : "";
 }
 
 function selectionForSelectedWorkspace(
@@ -298,19 +304,6 @@ function getWorkspaceArchiveStatus(
   if (isWorktree) return archiveStatus;
   if (isArchivingWorkspace) return "pending";
   return "idle";
-}
-
-export function useSidebarWorkspaceEntry(
-  serverId: string | null,
-  workspaceId: string | null,
-): SidebarWorkspaceEntry | null {
-  const projectWorkspaceEntry = useCallback(
-    (workspace: WorkspaceDescriptor): SidebarWorkspaceEntry =>
-      createSidebarWorkspaceEntry({ serverId: serverId ?? "", workspace }),
-    [serverId],
-  );
-
-  return useWorkspaceFields(serverId, workspaceId, projectWorkspaceEntry);
 }
 
 export function PrBadge({ hint }: { hint: PrHint }) {
@@ -537,6 +530,7 @@ function ProjectRowTrailingActions({
         >
           <ProjectKebabMenu
             projectKey={project.projectKey}
+            projectPath={project.iconWorkingDir}
             onRemoveProject={onRemoveProject}
             removeProjectStatus={removeProjectStatus}
           />
@@ -554,6 +548,9 @@ const markAsReadLeadingIcon = (
 );
 const archiveLeadingIcon = <ThemedArchive size={14} uniProps={foregroundMutedColorMapping} />;
 const renameLeadingIcon = <ThemedPencil size={14} uniProps={foregroundMutedColorMapping} />;
+const openInNewWindowLeadingIcon = (
+  <ThemedExternalLink size={14} uniProps={foregroundMutedColorMapping} />
+);
 
 function renderKebabTriggerIcon({ hovered }: { hovered?: boolean }) {
   return (
@@ -566,18 +563,35 @@ function renderKebabTriggerIcon({ hovered }: { hovered?: boolean }) {
 
 function ProjectKebabMenu({
   projectKey,
+  projectPath,
   onRemoveProject,
   removeProjectStatus,
 }: {
   projectKey: string;
+  projectPath: string;
   onRemoveProject: () => void;
   removeProjectStatus: "idle" | "pending" | "success";
 }) {
+  const toast = useToast();
   const handleOpenProjectSettings = useCallback(() => {
     if (projectKey.trim().length === 0) return;
     router.navigate(buildProjectSettingsRoute(projectKey));
   }, [projectKey]);
   const canOpenProjectSettings = projectKey.trim().length > 0;
+  // Desktop-only: open a second window that lands on this project via the same
+  // open-project flow as a CLI launch. The project stays visible here too — no
+  // ownership, no move.
+  const canOpenInNewWindow = getIsElectron() && projectPath.trim().length > 0;
+  const handleOpenInNewWindow = useCallback(() => {
+    const trimmedPath = projectPath.trim();
+    if (trimmedPath.length === 0) return;
+    void getDesktopHost()
+      ?.window?.openNew?.({ pendingOpenProjectPath: trimmedPath })
+      ?.catch((error) => {
+        console.warn("[sidebar] openNew failed", error);
+        toast.error("Couldn't open a new window");
+      });
+  }, [projectPath, toast]);
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -597,6 +611,15 @@ function ProjectKebabMenu({
             onSelect={handleOpenProjectSettings}
           >
             Open project settings
+          </DropdownMenuItem>
+        ) : null}
+        {canOpenInNewWindow ? (
+          <DropdownMenuItem
+            testID={`sidebar-project-menu-open-new-window-${projectKey}`}
+            leading={openInNewWindowLeadingIcon}
+            onSelect={handleOpenInNewWindow}
+          >
+            Open in new window
           </DropdownMenuItem>
         ) : null}
         <DropdownMenuItem
@@ -1193,17 +1216,14 @@ function ProjectHeaderRow({
     if (!serverId) {
       return;
     }
+    onWorkspacePress?.();
     router.navigate(
       buildHostNewWorkspaceRoute(serverId, project.iconWorkingDir, {
         displayName,
         projectId: project.projectKey,
       }) as Href,
     );
-    onWorkspacePress?.();
   }, [displayName, onWorkspacePress, project.iconWorkingDir, project.projectKey, serverId]);
-  const _mergeWorkspaces = useSessionStore((state) => state.mergeWorkspaces);
-  const _toast = useToast();
-
   const interaction = useLongPressDragInteraction({
     drag,
     menuController,
@@ -2299,6 +2319,7 @@ function ProjectBlock({
               keyExtractor={workspaceKeyExtractor}
               renderItem={renderWorkspace}
               onDragEnd={handleWorkspaceDragEnd}
+              extraData={activeWorkspaceSelectionKey(activeWorkspaceSelection)}
               scrollEnabled={false}
               useDragHandle
               nestable={useNestable}
@@ -2315,18 +2336,6 @@ function ProjectBlock({
 type ProjectBlockProps = Parameters<typeof ProjectBlock>[0];
 
 function areProjectBlockPropsEqual(previous: ProjectBlockProps, next: ProjectBlockProps): boolean {
-  const previousActive = isProjectSelectedByRoute({
-    selection: previous.activeWorkspaceSelection,
-    project: previous.project,
-    serverId: previous.serverId,
-    enabled: previous.selectionEnabled,
-  });
-  const nextActive = isProjectSelectedByRoute({
-    selection: next.activeWorkspaceSelection,
-    project: next.project,
-    serverId: next.serverId,
-    enabled: next.selectionEnabled,
-  });
   return (
     previous.project === next.project &&
     previous.collapsed === next.collapsed &&
@@ -2346,7 +2355,35 @@ function areProjectBlockPropsEqual(previous: ProjectBlockProps, next: ProjectBlo
     previous.dragHandleProps === next.dragHandleProps &&
     previous.useNestable === next.useNestable &&
     previous.creatingWorkspaceIds === next.creatingWorkspaceIds &&
-    previousActive === nextActive
+    areProjectBlockSelectionsEqual(previous, next)
+  );
+}
+
+function areProjectBlockSelectionsEqual(
+  previous: ProjectBlockProps,
+  next: ProjectBlockProps,
+): boolean {
+  const previousActive = isProjectSelectedByRoute({
+    selection: previous.activeWorkspaceSelection,
+    project: previous.project,
+    serverId: previous.serverId,
+    enabled: previous.selectionEnabled,
+  });
+  const nextActive = isProjectSelectedByRoute({
+    selection: next.activeWorkspaceSelection,
+    project: next.project,
+    serverId: next.serverId,
+    enabled: next.selectionEnabled,
+  });
+  if (previousActive !== nextActive) {
+    return false;
+  }
+  if (!previousActive) {
+    return true;
+  }
+  return (
+    activeWorkspaceSelectionKey(previous.activeWorkspaceSelection) ===
+    activeWorkspaceSelectionKey(next.activeWorkspaceSelection)
   );
 }
 
@@ -2372,6 +2409,7 @@ export function SidebarWorkspaceList({
     return (
       <SidebarStatusModeWrapper
         serverId={serverId}
+        projects={projects}
         shortcutIndexByWorkspaceKey={shortcutIndexByWorkspaceKey}
         onWorkspacePress={onWorkspacePress}
       />
@@ -2396,14 +2434,19 @@ export function SidebarWorkspaceList({
 
 function SidebarStatusModeWrapper({
   serverId,
+  projects,
   shortcutIndexByWorkspaceKey: _projectShortcutIndex,
   onWorkspacePress,
 }: {
   serverId: string | null;
+  projects: SidebarProjectEntry[];
   shortcutIndexByWorkspaceKey: Map<string, number>;
   onWorkspacePress?: () => void;
 }) {
-  const hydratedWorkspaces = useHydratedWorkspaceEntries(serverId);
+  const hydratedWorkspaces = useStatusModeWorkspaceEntries({
+    serverId,
+    projects,
+  });
   const projectNamesByKey = useProjectNamesMap(serverId);
   const showShortcutBadges = useShowShortcutBadges();
 
@@ -2463,74 +2506,11 @@ function ProjectModeList({
         : undefined,
     [parentGestureRef],
   );
-  const projectIconRequests = useMemo(() => {
-    if (!serverId) {
-      return [];
-    }
-    const unique = new Map<string, { serverId: string; cwd: string }>();
-    for (const project of projects) {
-      const cwd = project.iconWorkingDir.trim();
-      if (!cwd) {
-        continue;
-      }
-      unique.set(`${serverId}:${cwd}`, { serverId, cwd });
-    }
-    return Array.from(unique.values());
-  }, [projects, serverId]);
 
-  const projectIconQueries = useQueries({
-    queries: projectIconRequests.map((request) => ({
-      queryKey: projectIconQueryKey(request.serverId, request.cwd),
-      queryFn: async () => {
-        const client = getHostRuntimeStore().getClient(request.serverId);
-        if (!client) {
-          return null;
-        }
-        const result = await client.requestProjectIcon(request.cwd);
-        return result.icon;
-      },
-      select: projectIconToDataUri,
-      enabled: Boolean(
-        getHostRuntimeStore().getClient(request.serverId) &&
-        isHostRuntimeConnected(getHostRuntimeStore().getSnapshot(request.serverId)) &&
-        request.cwd,
-      ),
-      staleTime: Infinity,
-      gcTime: 1000 * 60 * 60,
-      refetchOnMount: false,
-      refetchOnWindowFocus: false,
-      refetchOnReconnect: false,
-    })),
+  const projectIconByProjectKey = useProjectIconDataByProjectKey({
+    serverId,
+    projects,
   });
-
-  const projectIconSignature = projectIconQueries.map((query) => query.data ?? "").join("\u0000");
-  const projectIconData = useStableProjectIconData(
-    projectIconQueries.map((query) => query.data ?? null),
-    projectIconSignature,
-  );
-
-  const projectIconByProjectKey = useMemo(() => {
-    const iconByServerAndCwd = new Map<string, string | null>();
-    for (let index = 0; index < projectIconRequests.length; index += 1) {
-      const request = projectIconRequests[index];
-      if (!request) {
-        continue;
-      }
-      iconByServerAndCwd.set(`${request.serverId}:${request.cwd}`, projectIconData[index] ?? null);
-    }
-
-    const byProject = new Map<string, string | null>();
-    for (const project of projects) {
-      const cwd = project.iconWorkingDir.trim();
-      if (!cwd || !serverId) {
-        byProject.set(project.projectKey, null);
-        continue;
-      }
-      byProject.set(project.projectKey, iconByServerAndCwd.get(`${serverId}:${cwd}`) ?? null);
-    }
-
-    return byProject;
-  }, [projectIconData, projectIconRequests, projects, serverId]);
 
   useEffect(() => {
     const timeouts = creatingWorkspaceTimeoutsRef.current;
@@ -2721,6 +2701,7 @@ function ProjectModeList({
           keyExtractor={projectKeyExtractor}
           renderItem={renderProject}
           onDragEnd={handleProjectDragEnd}
+          extraData={activeWorkspaceSelectionKey(activeWorkspaceSelection)}
           scrollEnabled={false}
           useDragHandle
           nestable={platformIsNative}
