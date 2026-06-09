@@ -135,6 +135,7 @@ import {
   buildWorkspaceTabMenuEntries,
   type WorkspaceTabMenuEntry,
 } from "@/screens/workspace/workspace-tab-menu";
+import { useDesktopBrowserNewTabRequests } from "@/browser/new-tab-requests";
 import type { WorkspaceTabDescriptor } from "@/screens/workspace/workspace-tabs-types";
 import {
   resolveWorkspaceHeaderRenderState,
@@ -2358,6 +2359,12 @@ function WorkspaceScreenContent({
     },
     [openWorkspaceTabFocused, persistenceKey],
   );
+
+  useDesktopBrowserNewTabRequests({
+    enabled: Boolean(persistenceKey),
+    workspaceLayout,
+    openUrl: handleOpenUrlInBrowserTab,
+  });
 
   const handleSelectSwitcherTab = useCallback(
     (key: string) => {
