@@ -109,6 +109,8 @@ export interface CreateTerminalOptions {
   title?: string;
   command?: string;
   args?: string[];
+  /** Text written to the PTY once after spawn (e.g. a preset command to run). */
+  initialInput?: string;
 }
 
 interface BuildTerminalEnvironmentInput {
@@ -581,6 +583,14 @@ function extractLastOutputLinesFromText(text: string, limit: number): string[] {
   return lines.slice(-limit);
 }
 
+function writePtyInitialInput(ptyProcess: pty.IPty, initialInput: string | undefined): void {
+  if (initialInput) {
+    // The kernel buffers PTY input, so the shell consumes it once ready — no
+    // readiness race. Used to seed a preset command into a fresh terminal.
+    ptyProcess.write(initialInput);
+  }
+}
+
 export async function createTerminal(options: CreateTerminalOptions): Promise<TerminalSession> {
   const {
     cwd,
@@ -592,6 +602,7 @@ export async function createTerminal(options: CreateTerminalOptions): Promise<Te
     title: presetTitle,
     command,
     args = [],
+    initialInput,
   } = options;
   const resolvedShell = shell ?? resolveDefaultTerminalShell();
 
@@ -637,6 +648,8 @@ export async function createTerminal(options: CreateTerminalOptions): Promise<Te
     cwd,
     env: buildTerminalEnvironment({ shell: spawnCommand, env }),
   });
+
+  writePtyInitialInput(ptyProcess, initialInput);
 
   function emitTitleChange(nextTitle: string | undefined): void {
     if (title === nextTitle) {

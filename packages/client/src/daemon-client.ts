@@ -3779,7 +3779,12 @@ export class DaemonClient {
     cwd: string,
     name?: string,
     requestId?: string,
-    options?: { agentId?: string; command?: string; args?: string[] },
+    options?: {
+      agentId?: string;
+      command?: string;
+      args?: string[];
+      initialInput?: string;
+    },
   ): Promise<CreateTerminalPayload> {
     const resolvedRequestId = this.createRequestId(requestId);
     const message = SessionInboundMessageSchema.parse({
@@ -3789,6 +3794,7 @@ export class DaemonClient {
       agentId: options?.agentId,
       command: options?.command,
       args: options?.args,
+      initialInput: options?.initialInput,
       requestId: resolvedRequestId,
     });
     return this.sendCorrelatedRequest({

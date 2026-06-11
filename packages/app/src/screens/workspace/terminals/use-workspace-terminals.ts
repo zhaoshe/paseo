@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
+import type { PaseoTerminalPreset } from "@getpaseo/protocol/paseo-config-schema";
 import type { WorkspaceDescriptor } from "@/stores/session-store";
 import {
   buildTerminalsQueryKey,
@@ -17,6 +18,8 @@ import {
 
 interface PendingTerminalCreateInput {
   paneId?: string;
+  /** When set, the new terminal runs this preset command in its default shell. */
+  preset?: PaseoTerminalPreset;
 }
 
 interface UseWorkspaceTerminalsInput {
@@ -104,9 +107,20 @@ export function useWorkspaceTerminals(input: UseWorkspaceTerminalsInput) {
   );
 
   const createMutation = useMutation({
-    mutationFn: async (_input?: PendingTerminalCreateInput) => {
+    mutationFn: async (createInput?: PendingTerminalCreateInput) => {
       if (!client || !workspaceDirectory) {
         throw new Error("Host is not connected");
+      }
+      const preset = createInput?.preset;
+      if (preset) {
+        // Run the preset in the default interactive shell, optionally cd'ing into
+        // a subdirectory first. JSON.stringify quotes the path for POSIX shells.
+        const command = preset.cwd
+          ? `cd ${JSON.stringify(preset.cwd)} && ${preset.command}`
+          : preset.command;
+        return await client.createTerminal(workspaceDirectory, preset.name, undefined, {
+          initialInput: `${command}\r`,
+        });
       }
       return await client.createTerminal(workspaceDirectory);
     },

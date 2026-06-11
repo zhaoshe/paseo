@@ -57,6 +57,7 @@ import { getAgentProviderDefinition } from "@getpaseo/protocol/provider-manifest
 import { IMPORTABLE_PROVIDERS } from "./provider-registry.js";
 import { invokeRewindCapability, type RewindMode } from "./rewind/rewind.js";
 import { isSystemInjectedEnvelope } from "./agent-prompt.js";
+import { sampleProcessMetrics, type ProcessMetrics } from "./process-metrics.js";
 
 const RELOAD_SESSION_CLOSE_TIMEOUT_MS = 3_000;
 const INTERRUPT_SESSION_TIMEOUT_MS = 2_000;
@@ -187,6 +188,15 @@ export interface AgentManagerOptions {
   appendSystemPrompt?: string;
   agentStreamCoalesceWindowMs?: number;
   rescueTimeouts?: AgentManagerRescueTimeouts;
+  /**
+   * Per-agent CPU/memory sampling. Disabled unless `enabled` is set, so tests
+   * don't spin up a background interval. `sampler` is injectable for testing.
+   */
+  processMetrics?: {
+    enabled?: boolean;
+    intervalMs?: number;
+    sampler?: (pid: number, sampledAt: string) => Promise<ProcessMetrics | null>;
+  };
   logger: Logger;
 }
 
@@ -269,6 +279,12 @@ interface ManagedAgentBase {
    * User-defined labels for categorizing agents (e.g., { surface: "workspace" }).
    */
   labels: Record<string, string>;
+  /**
+   * Latest CPU/memory sample for the agent's process. Live-only (never
+   * persisted); absent until the first sample and for providers without a
+   * dedicated process. Populated by the AgentManager metrics sampler.
+   */
+  processMetrics?: ProcessMetrics;
 }
 
 type ManagedAgentWithSession = ManagedAgentBase & {
@@ -410,6 +426,8 @@ function buildExplicitTimelineSeedForRegister(
   };
 }
 
+const DEFAULT_PROCESS_METRICS_INTERVAL_MS = 4000;
+
 export class AgentManager {
   private readonly clients = new Map<AgentProvider, AgentClient>();
   private readonly providerEnabled = new Map<AgentProvider, boolean>();
@@ -432,6 +450,11 @@ export class AgentManager {
   private onAgentArchived?: AgentArchivedCallback;
   private logger: Logger;
   private readonly rescueTimeouts: Required<AgentManagerRescueTimeouts>;
+  private readonly processMetricsSampler: (
+    pid: number,
+    sampledAt: string,
+  ) => Promise<ProcessMetrics | null>;
+  private processMetricsInterval: ReturnType<typeof setInterval> | null = null;
 
   constructor(options: AgentManagerOptions) {
     this.idFactory = options?.idFactory ?? (() => randomUUID());
@@ -459,6 +482,53 @@ export class AgentManager {
       providerDefinitions: options.providerDefinitions ?? {},
       clients: options.clients ?? {},
     });
+    this.processMetricsSampler = options.processMetrics?.sampler ?? sampleProcessMetrics;
+    this.startProcessMetricsSampling(options.processMetrics);
+  }
+
+  private startProcessMetricsSampling(config: AgentManagerOptions["processMetrics"]): void {
+    if (!config?.enabled) {
+      return;
+    }
+    const intervalMs = config.intervalMs ?? DEFAULT_PROCESS_METRICS_INTERVAL_MS;
+    this.processMetricsInterval = setInterval(() => {
+      void this.sampleProcessMetrics();
+    }, intervalMs);
+    // Don't keep the event loop alive solely for metrics sampling.
+    this.processMetricsInterval.unref?.();
+  }
+
+  /**
+   * Sample CPU/memory for every live agent that exposes a process id and
+   * broadcast the result. Live-only — metrics are never persisted. Skips
+   * agents replaced mid-sample so a stale write can't clobber a new session.
+   */
+  private async sampleProcessMetrics(): Promise<void> {
+    const sampledAt = new Date().toISOString();
+    for (const agent of this.agents.values()) {
+      const pid = agent.session.getPid?.();
+      if (pid === undefined) {
+        continue;
+      }
+      const metrics = await this.processMetricsSampler(pid, sampledAt);
+      const current = this.agents.get(agent.id);
+      if (!current || current.session !== agent.session) {
+        continue;
+      }
+      if (metrics === null && current.processMetrics === undefined) {
+        continue;
+      }
+      current.processMetrics = metrics ?? undefined;
+      this.emitState(current, { persist: false });
+    }
+  }
+
+  /** Stop the background metrics sampler. */
+  stopProcessMetricsSampling(): void {
+    if (this.processMetricsInterval !== null) {
+      clearInterval(this.processMetricsInterval);
+      this.processMetricsInterval = null;
+    }
   }
 
   registerClient(provider: AgentProvider, client: AgentClient): void {

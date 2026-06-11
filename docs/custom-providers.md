@@ -664,3 +664,55 @@ A config.json with multiple custom providers:
   }
 }
 ```
+
+## Generic terminal provider (`extends: "terminal"`)
+
+For a CLI agent that has no native Paseo adapter and does not speak ACP, use
+`extends: "terminal"`. Each turn runs `command` as a **one-shot filter** in the
+project directory: the prompt is written to the process stdin, stdout/stderr
+stream back as a single growing assistant message, and the turn completes when
+the process exits (a non-zero exit becomes a failed turn).
+
+```json
+{
+  "daemon": {
+    "providers": {
+      "llm": {
+        "extends": "terminal",
+        "label": "llm CLI",
+        "command": ["llm"]
+      }
+    }
+  }
+}
+```
+
+This is the zero-adapter fallback for the long tail of CLI tools. It uses piped
+stdio (not a PTY) on purpose — most CLIs emit clean, color-free text when stdout
+is not a TTY, which maps onto the structured timeline; ANSI sequences are
+stripped as a safety net. It does **not** support modes, tool calls, permission
+prompts, or session resume. Interactive TUI agents (full-screen cursor control,
+live menus) are a poor fit for the structured timeline — run those in the
+terminal surface instead, optionally via a terminal preset (below).
+
+## Terminal presets (`worktree.terminals`)
+
+A project's `paseo.json` can declare quick-launch terminal commands. Each preset
+opens a new terminal in the default interactive shell and runs `command`.
+Presets are launchable from the keyboard: `Ctrl+1`–`Ctrl+9` on macOS,
+`Ctrl+Alt+1`–`Ctrl+Alt+9` elsewhere (desktop only).
+
+```json
+{
+  "worktree": {
+    "terminals": [
+      { "name": "Dev server", "command": "npm run dev" },
+      { "name": "Tests", "command": "npm test", "cwd": "./packages/app" }
+    ]
+  }
+}
+```
+
+`name` and `command` are required; entries missing either are dropped. `cwd` is
+optional and resolved relative to the workspace directory. The CLI exposes the
+same one-off launch via `paseo terminal create --command "<cmd>"`.

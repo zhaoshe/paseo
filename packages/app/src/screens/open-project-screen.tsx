@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type ComponentType } from "react";
 import { View, Text, Pressable } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { useRouter } from "expo-router";
-import { FolderOpen, Inbox, Plug, Smartphone } from "lucide-react-native";
+import { FolderOpen, Inbox, Plug, Smartphone, Sparkles } from "lucide-react-native";
 import { PaseoLogo } from "@/components/icons/paseo-logo";
 import { CommunityLinks } from "@/components/community-links";
 import { MenuHeader } from "@/components/headers/menu-header";
@@ -21,6 +21,9 @@ import { buildHostAgentDetailRoute, buildSettingsHostSectionRoute } from "@/util
 import { ImportSessionSheet } from "@/components/import-session-sheet";
 import { useHostRuntimeClient } from "@/runtime/host-runtime";
 import { useOpenProject } from "@/hooks/use-open-project";
+import { TemplateGalleryModal } from "@/components/template-gallery-modal";
+import { useScaffoldFromTemplate } from "@/hooks/use-scaffold-from-template";
+import type { ProjectTemplate } from "@/templates/project-templates";
 import type { Href } from "expo-router";
 
 export function OpenProjectScreen({ serverId }: { serverId: string }) {
@@ -30,8 +33,10 @@ export function OpenProjectScreen({ serverId }: { serverId: string }) {
   const isLocalDaemon = useIsLocalDaemon(serverId);
   const client = useHostRuntimeClient(serverId);
   const openProject = useOpenProject(serverId);
+  const scaffoldFromTemplate = useScaffoldFromTemplate(serverId);
   const [isPairDeviceOpen, setIsPairDeviceOpen] = useState(false);
   const [isImportSheetOpen, setIsImportSheetOpen] = useState(false);
+  const [isTemplateGalleryOpen, setIsTemplateGalleryOpen] = useState(false);
 
   const isCompactLayout = useIsCompactFormFactor();
 
@@ -65,6 +70,16 @@ export function OpenProjectScreen({ serverId }: { serverId: string }) {
     router.push(buildSettingsHostSectionRoute(serverId, "providers"));
   }, [router, serverId]);
 
+  const handleOpenTemplateGallery = useCallback(() => setIsTemplateGalleryOpen(true), []);
+  const handleCloseTemplateGallery = useCallback(() => setIsTemplateGalleryOpen(false), []);
+  const handleSelectTemplate = useCallback(
+    (template: ProjectTemplate) => {
+      setIsTemplateGalleryOpen(false);
+      void scaffoldFromTemplate(template);
+    },
+    [scaffoldFromTemplate],
+  );
+
   return (
     <View style={styles.container}>
       <MenuHeader borderless />
@@ -81,6 +96,13 @@ export function OpenProjectScreen({ serverId }: { serverId: string }) {
             onPress={handleOpenPicker}
             testID="open-project-submit"
             accent
+          />
+          <HomeTile
+            icon={Sparkles}
+            title="Start from a template"
+            description="Scaffold a new project from a starter"
+            onPress={handleOpenTemplateGallery}
+            testID="open-project-template-gallery"
           />
           <HomeTile
             icon={Inbox}
@@ -110,6 +132,12 @@ export function OpenProjectScreen({ serverId }: { serverId: string }) {
       <View style={styles.communityRow}>
         <CommunityLinks />
       </View>
+      <TemplateGalleryModal
+        visible={isTemplateGalleryOpen}
+        onClose={handleCloseTemplateGallery}
+        onSelect={handleSelectTemplate}
+        testID="open-project-template-gallery-modal"
+      />
       <PairDeviceModal
         visible={isPairDeviceOpen}
         onClose={handleClosePairDevice}

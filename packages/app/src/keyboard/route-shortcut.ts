@@ -113,6 +113,15 @@ function routeWorkspaceTabNavigateRelative(payload: KeyboardShortcutPayload): Sh
   });
 }
 
+function routeWorkspaceTerminalPreset(payload: KeyboardShortcutPayload): ShortcutAction {
+  if (!hasPayloadKey(payload, "index")) return NONE;
+  return dispatch({
+    id: "workspace.terminal.preset",
+    scope: "workspace",
+    index: payload.index,
+  });
+}
+
 function routeWorkspaceNavigateIndex(
   payload: KeyboardShortcutPayload,
   ctx: ShortcutRoutingContext,
@@ -187,6 +196,8 @@ export function routeKeyboardShortcut(
       return routeWorkspaceTabNavigateIndex(input.payload);
     case "workspace.tab.navigate.relative":
       return routeWorkspaceTabNavigateRelative(input.payload);
+    case "workspace.terminal.preset":
+      return routeWorkspaceTerminalPreset(input.payload);
     case "workspace.navigate.index":
       return routeWorkspaceNavigateIndex(input.payload, ctx);
     case "workspace.navigate.relative":

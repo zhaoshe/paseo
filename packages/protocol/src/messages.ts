@@ -669,6 +669,14 @@ export const AgentSnapshotPayloadSchema = z.object({
   attentionTimestamp: z.string().nullable().optional(),
   archivedAt: z.string().nullable().optional(),
   providerUnavailable: z.boolean().optional(),
+  // COMPAT(processMetrics): added in v0.1.92, drop the gate when floor >= v0.1.92
+  metrics: z
+    .object({
+      cpuPercent: z.number(),
+      memoryBytes: z.number(),
+      sampledAt: z.string(),
+    })
+    .optional(),
 });
 
 export type AgentSnapshotPayload = z.infer<typeof AgentSnapshotPayloadSchema>;
@@ -1755,6 +1763,9 @@ export const CreateTerminalRequestSchema = z.object({
   agentId: z.string().optional(),
   command: z.string().optional(),
   args: z.array(z.string()).optional(),
+  // Text written to the PTY once after spawn (e.g. a terminal-preset command to
+  // run in the default interactive shell). Optional and append-only.
+  initialInput: z.string().optional(),
   requestId: z.string(),
 });
 
@@ -2122,6 +2133,8 @@ export const ServerInfoStatusPayloadSchema = z
         rewind: z.boolean().optional(),
         // COMPAT(checkoutRefresh): added in v0.1.86, remove gate after 2026-11-29.
         checkoutRefresh: z.boolean().optional(),
+        // COMPAT(processMetrics): added in v0.1.92, drop the gate when floor >= v0.1.92.
+        processMetrics: z.boolean().optional(),
       })
       .optional(),
   })

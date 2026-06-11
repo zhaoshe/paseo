@@ -131,6 +131,10 @@ export function toAgentPayload(
     labels: agent.labels,
   };
 
+  if (agent.processMetrics !== undefined) {
+    payload.metrics = agent.processMetrics;
+  }
+
   const usage = sanitizeUsage(agent.lastUsage);
   if (usage !== undefined) {
     payload.lastUsage = usage;

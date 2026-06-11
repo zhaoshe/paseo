@@ -175,6 +175,7 @@ import { getIsElectron, isNative, isWeb } from "@/constants/platform";
 import { useContainerWidthBelow } from "@/hooks/use-container-width";
 import { buildHostRootRoute, buildSettingsHostRoute } from "@/utils/host-routes";
 import { canCreateWorkspaceTerminal } from "@/screens/workspace/terminals/state";
+import { useTerminalPresets } from "@/screens/workspace/terminals/use-terminal-presets";
 import { useWorkspaceTerminals } from "@/screens/workspace/terminals/use-workspace-terminals";
 import {
   createWorkspaceFileTabTarget,
@@ -2721,6 +2722,7 @@ function WorkspaceScreenContent({
     [handleCloseOtherTabsInPane, tabs],
   );
 
+  const terminalPresets = useTerminalPresets({ client, workspaceDirectory });
   const handleWorkspaceTabAction = useCallback(
     (action: KeyboardActionDefinition): boolean => {
       switch (action.id) {
@@ -2730,6 +2732,13 @@ function WorkspaceScreenContent({
         case "workspace.terminal.new":
           handleCreateTerminal();
           return true;
+        case "workspace.terminal.preset": {
+          const preset = terminalPresets[action.index - 1];
+          if (preset) {
+            handleCreateTerminal({ preset });
+          }
+          return true;
+        }
         case "workspace.tab.close-current":
           if (activeTabId) {
             void handleCloseTabById(activeTabId);
@@ -2765,6 +2774,7 @@ function WorkspaceScreenContent({
       handleCreateTerminal,
       navigateToTabId,
       tabs,
+      terminalPresets,
     ],
   );
 
@@ -2866,6 +2876,7 @@ function WorkspaceScreenContent({
       "workspace.tab.navigate-index",
       "workspace.tab.navigate-relative",
       "workspace.terminal.new",
+      "workspace.terminal.preset",
     ] as const,
     enabled: Boolean(isRouteFocused && normalizedServerId && normalizedWorkspaceId),
     priority: 100,

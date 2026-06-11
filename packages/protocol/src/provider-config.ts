@@ -63,7 +63,7 @@ export const ProviderOverridesSchema = z
   .record(ProviderOverrideSchema)
   .superRefine((providers, ctx) => {
     const builtinProviderIdSet = new Set<string>(BUILTIN_PROVIDER_IDS);
-    const validExtendsValues = new Set<string>([...BUILTIN_PROVIDER_IDS, "acp"]);
+    const validExtendsValues = new Set<string>([...BUILTIN_PROVIDER_IDS, "acp", "terminal"]);
 
     for (const [providerId, provider] of Object.entries(providers)) {
       if (!PROVIDER_ID_PATTERN.test(providerId)) {

@@ -23,7 +23,8 @@ export function createTerminalCommand(): Command {
       .command("create")
       .description("Create a terminal")
       .option("--cwd <path>", "Workspace directory")
-      .option("--name <name>", "Terminal name"),
+      .option("--name <name>", "Terminal name")
+      .option("--command <command>", "Run a command in the terminal once it starts"),
   ).action(withOutput(runCreateCommand));
 
   addJsonAndDaemonHostOptions(

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { PaseoConfigRawSchema, PaseoConfigSchema } from "@getpaseo/protocol/paseo-config-schema";
+import {
+  normalizeTerminalPresets,
+  PaseoConfigRawSchema,
+  PaseoConfigSchema,
+} from "@getpaseo/protocol/paseo-config-schema";
 
 describe("paseo config schema", () => {
   it("parses an empty config without metadata generation", () => {
@@ -150,5 +154,72 @@ describe("paseo config schema", () => {
         agentTitle: {},
       },
     });
+  });
+
+  it("parses valid terminal presets with optional cwd", () => {
+    const parsed = PaseoConfigSchema.parse({
+      worktree: {
+        setup: "npm install",
+        terminals: [
+          { name: "Dev", command: "npm run dev" },
+          { name: "Logs", command: "tail -f log.txt", cwd: "./logs" },
+        ],
+      },
+    });
+
+    expect(parsed.worktree?.terminals).toEqual([
+      { name: "Dev", command: "npm run dev" },
+      { name: "Logs", command: "tail -f log.txt", cwd: "./logs" },
+    ]);
+  });
+
+  it("drops invalid terminal preset entries", () => {
+    const parsed = PaseoConfigSchema.parse({
+      worktree: {
+        terminals: [
+          { name: "Valid", command: "ls" },
+          { name: "", command: "ls" },
+          { name: "NoCommand" },
+          "not an object",
+          { name: 42, command: "ls" },
+        ],
+      },
+    });
+
+    expect(parsed.worktree?.terminals).toEqual([{ name: "Valid", command: "ls" }]);
+  });
+
+  it("omits terminals when none are configured", () => {
+    const parsed = PaseoConfigSchema.parse({ worktree: { setup: "npm install" } });
+
+    expect(parsed.worktree?.terminals).toBeUndefined();
+  });
+
+  it("raw schema round-trips terminal presets unchanged", () => {
+    const config = {
+      worktree: { terminals: [{ name: "Dev", command: "npm run dev" }] },
+    };
+
+    expect(PaseoConfigRawSchema.parse(config)).toEqual(config);
+  });
+});
+
+describe("normalizeTerminalPresets", () => {
+  it("returns an empty array for non-array input", () => {
+    expect(normalizeTerminalPresets(undefined)).toEqual([]);
+    expect(normalizeTerminalPresets(null)).toEqual([]);
+    expect(normalizeTerminalPresets("nope")).toEqual([]);
+  });
+
+  it("trims name, command, and cwd", () => {
+    expect(
+      normalizeTerminalPresets([{ name: "  Dev  ", command: "  npm run dev  ", cwd: "  ./app  " }]),
+    ).toEqual([{ name: "Dev", command: "npm run dev", cwd: "./app" }]);
+  });
+
+  it("drops cwd when blank", () => {
+    expect(normalizeTerminalPresets([{ name: "Dev", command: "npm run dev", cwd: "   " }])).toEqual(
+      [{ name: "Dev", command: "npm run dev" }],
+    );
   });
 });

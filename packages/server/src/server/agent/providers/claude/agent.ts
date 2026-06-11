@@ -1617,6 +1617,7 @@ class ClaudeAgentSession implements AgentSession {
   private readonly rewindTurnAnchors: ClaudeRewindTurnAnchor[] = [];
   private pendingFreshSessionId: string | null = null;
   private recentStderr = "";
+  private processPid: number | undefined;
   private closed = false;
 
   constructor(config: ClaudeAgentConfig, options: ClaudeAgentSessionOptions) {
@@ -1666,6 +1667,10 @@ class ClaudeAgentSession implements AgentSession {
       modelId: this.config.model,
       fastModeEnabled: this.config.featureValues?.fast_mode === true,
     });
+  }
+
+  getPid(): number | undefined {
+    return this.processPid;
   }
 
   async getRuntimeInfo(): Promise<AgentRuntimeInfo> {
@@ -2456,6 +2461,9 @@ class ClaudeAgentSession implements AgentSession {
         runtimeSettings: this.runtimeSettings,
         launchEnv: this.launchEnv,
         queryFactory: this.queryFactory,
+        onProcessSpawn: (pid) => {
+          this.processPid = pid;
+        },
       },
     );
     const fastMode = this.resolveFastModeSetting();

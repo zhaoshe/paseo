@@ -10,6 +10,7 @@ import { terminalSchema, type TerminalRow, toTerminalRow } from "./schema.js";
 export interface TerminalCreateOptions extends TerminalCommandOptions {
   cwd?: string;
   name?: string;
+  command?: string;
 }
 
 export async function runCreateCommand(
@@ -20,7 +21,12 @@ export async function runCreateCommand(
   const cwd = options.cwd ?? process.cwd();
 
   try {
-    const payload = await client.createTerminal(cwd, options.name);
+    const payload = await client.createTerminal(
+      cwd,
+      options.name,
+      undefined,
+      options.command ? { initialInput: `${options.command}\r` } : undefined,
+    );
     if (!payload.terminal) {
       const error: CommandError = {
         code: "TERMINAL_CREATE_FAILED",

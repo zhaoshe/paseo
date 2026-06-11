@@ -20,6 +20,8 @@ export type ClaudeQueryFactory = (input: ClaudeQueryInput) => Query;
 export interface ClaudeQueryContext {
   runtimeSettings?: ProviderRuntimeSettings;
   launchEnv?: Record<string, string>;
+  /** Invoked with the spawned Claude process pid for per-agent resource sampling. */
+  onProcessSpawn?: (pid: number | undefined) => void;
   queryFactory?: ClaudeQueryFactory;
 }
 
@@ -56,6 +58,7 @@ function applyRuntimeSettingsToClaudeOptions(
   options: ClaudeOptions,
   runtimeSettings?: ProviderRuntimeSettings,
   launchEnv?: Record<string, string>,
+  onProcessSpawn?: (pid: number | undefined) => void,
 ): ClaudeOptions {
   return {
     ...options,
@@ -94,6 +97,7 @@ function applyRuntimeSettingsToClaudeOptions(
         // The command is always a resolved binary path, so shell routing is unnecessary.
         shell: false,
       });
+      onProcessSpawn?.(child.pid);
       if (typeof options.stderr === "function") {
         child.stderr?.on("data", (chunk: Buffer | string) => {
           options.stderr?.(chunk.toString());
@@ -115,6 +119,7 @@ export function claudeQuery(input: ClaudeQueryInput, context: ClaudeQueryContext
       input.options,
       context.runtimeSettings,
       context.launchEnv,
+      context.onProcessSpawn,
     ),
   });
 }

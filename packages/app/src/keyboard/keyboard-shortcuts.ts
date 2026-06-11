@@ -600,6 +600,34 @@ const SHORTCUT_BINDINGS: readonly ShortcutBinding[] = [
     },
   },
 
+  // --- Terminal presets (run a preset command in a new terminal) ---
+  {
+    id: "workspace-terminal-preset-ctrl-digit-mac",
+    action: "workspace.terminal.preset",
+    combo: "Ctrl+Digit",
+    when: { mac: true, desktop: true, commandCenter: false },
+    payload: { type: "index" },
+    help: {
+      id: "workspace-terminal-preset",
+      section: "panels",
+      label: "Run terminal preset",
+      keys: ["ctrl", "1-9"],
+    },
+  },
+  {
+    id: "workspace-terminal-preset-ctrl-alt-digit-non-mac",
+    action: "workspace.terminal.preset",
+    combo: "Ctrl+Alt+Digit",
+    when: { mac: false, desktop: true, commandCenter: false, terminal: false },
+    payload: { type: "index" },
+    help: {
+      id: "workspace-terminal-preset",
+      section: "panels",
+      label: "Run terminal preset",
+      keys: ["ctrl", "alt", "1-9"],
+    },
+  },
+
   // --- Command center ---
   {
     id: "command-center-toggle-cmd-k-mac",

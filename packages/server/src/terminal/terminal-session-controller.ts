@@ -428,6 +428,7 @@ export class TerminalSessionController {
         name: msg.name,
         command: msg.command,
         args: msg.args,
+        initialInput: msg.initialInput,
       });
       this.ensureExitSubscription(session);
       this.emit({

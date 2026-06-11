@@ -32,6 +32,7 @@ export interface TerminalManager {
     env?: Record<string, string>;
     command?: string;
     args?: string[];
+    initialInput?: string;
   }): Promise<TerminalSession>;
   registerCwdEnv(options: { cwd: string; env: Record<string, string> }): void;
   getTerminal(id: string): TerminalSession | undefined;
@@ -190,6 +191,7 @@ export function createTerminalManager(): TerminalManager {
       env?: Record<string, string>;
       command?: string;
       args?: string[];
+      initialInput?: string;
     }): Promise<TerminalSession> {
       assertAbsolutePath(options.cwd);
 
@@ -206,6 +208,7 @@ export function createTerminalManager(): TerminalManager {
           ...(options.title ? { title: options.title } : {}),
           ...(options.command ? { command: options.command } : {}),
           ...(options.args ? { args: options.args } : {}),
+          ...(options.initialInput ? { initialInput: options.initialInput } : {}),
           ...(mergedEnv ? { env: mergedEnv } : {}),
         }),
       );

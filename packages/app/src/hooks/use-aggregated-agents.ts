@@ -78,6 +78,7 @@ export function useAggregatedAgents(options?: {
           archivedAt: agent.archivedAt,
           createdAt: agent.createdAt,
           labels: agent.labels,
+          metrics: agent.metrics,
         };
         allAgents.push(nextAgent);
       }

@@ -588,6 +588,13 @@ export interface AgentSession {
   describePersistence(): AgentPersistenceHandle | null;
   interrupt(): Promise<void>;
   close(): Promise<void>;
+  /**
+   * The OS process id of this session's underlying agent process, when the
+   * provider runs a dedicated child process. Used for per-agent resource
+   * sampling. Optional — providers backed by a shared server or transport (no
+   * 1:1 process) leave it unimplemented, and metrics are simply absent.
+   */
+  getPid?(): number | undefined;
   listCommands?(): Promise<AgentSlashCommand[]>;
   setModel?(modelId: string | null): Promise<void>;
   setThinkingOption?(thinkingOptionId: string | null): Promise<void>;

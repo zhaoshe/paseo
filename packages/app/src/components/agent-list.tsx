@@ -122,6 +122,13 @@ function deriveDateSectionLabel(lastActivityAt: Date): string {
   return "Older";
 }
 
+function formatAgentMetrics(metrics: NonNullable<AggregatedAgent["metrics"]>): string {
+  const megabytes = metrics.memoryBytes / (1024 * 1024);
+  const memory =
+    megabytes >= 1024 ? `${(megabytes / 1024).toFixed(1)} GB` : `${Math.round(megabytes)} MB`;
+  return `${Math.round(metrics.cpuPercent)}% · ${memory}`;
+}
+
 function formatStatusLabel(status: AggregatedAgent["status"]): string {
   switch (status) {
     case "initializing":
@@ -243,6 +250,9 @@ function SessionRow({
           ) : null}
           {!isMobile && showAttentionIndicator && agent.requiresAttention ? (
             <SessionBadge label="Attention" tone="danger" />
+          ) : null}
+          {!isMobile && agent.metrics ? (
+            <SessionBadge label={formatAgentMetrics(agent.metrics)} />
           ) : null}
         </View>
         {isMobile && (

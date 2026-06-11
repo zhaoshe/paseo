@@ -36,6 +36,7 @@ import { CursorACPAgentClient } from "./providers/cursor-acp-agent.js";
 import { GenericACPAgentClient } from "./providers/generic-acp-agent.js";
 import { OpenCodeAgentClient } from "./providers/opencode-agent.js";
 import { PiRpcAgentClient } from "./providers/pi/agent.js";
+import { PtyPassthroughAgentClient } from "./providers/pty-passthrough-agent.js";
 import { MockLoadTestAgentClient } from "./providers/mock-load-test-agent.js";
 import { MockSlowProviderClient } from "./providers/mock-slow-provider.js";
 import {
@@ -536,6 +537,87 @@ function buildResolvedBuiltinProviders(
   return resolvedProviders;
 }
 
+function buildAcpDerivedProvider(providerId: string, override: ProviderOverride): ResolvedProvider {
+  if (!override.command || !isNonEmptyStringArray(override.command)) {
+    throw new Error(`ACP provider '${providerId}' requires a command`);
+  }
+  // Capture command in const for closure - TypeScript can't track type refinement inside closures
+  const command = override.command;
+  return {
+    definition: createDerivedDefinition(
+      providerId,
+      {
+        id: providerId,
+        label: override.label ?? providerId,
+        description: override.description ?? "Custom ACP provider",
+        defaultModeId: null,
+        modes: [],
+      },
+      override,
+    ),
+    runtimeSettings: toRuntimeSettings(override),
+    profileModels: override.models ?? [],
+    additionalModels: override.additionalModels ?? [],
+    profileModelsAreAdditive: false,
+    enabled: override.enabled !== false,
+    derivedFromProviderId: null,
+    createBaseClient: (logger) =>
+      providerId === "cursor"
+        ? new CursorACPAgentClient({
+            logger,
+            command,
+            env: override.env,
+            providerId,
+            label: override.label ?? providerId,
+          })
+        : new GenericACPAgentClient({
+            logger,
+            command,
+            env: override.env,
+            providerId,
+            label: override.label ?? providerId,
+          }),
+  };
+}
+
+function buildTerminalDerivedProvider(
+  providerId: string,
+  override: ProviderOverride,
+): ResolvedProvider {
+  if (!override.command || !isNonEmptyStringArray(override.command)) {
+    throw new Error(`Terminal provider '${providerId}' requires a command`);
+  }
+  // Capture command in const for closure - TypeScript can't track type refinement inside closures
+  const command = override.command;
+  return {
+    definition: createDerivedDefinition(
+      providerId,
+      {
+        id: providerId,
+        label: override.label ?? providerId,
+        description: override.description ?? "Custom terminal agent",
+        defaultModeId: null,
+        modes: [],
+      },
+      override,
+    ),
+    runtimeSettings: toRuntimeSettings(override),
+    profileModels: override.models ?? [],
+    additionalModels: override.additionalModels ?? [],
+    profileModelsAreAdditive: false,
+    enabled: override.enabled !== false,
+    derivedFromProviderId: null,
+    createBaseClient: (logger) =>
+      new PtyPassthroughAgentClient({
+        logger,
+        command,
+        env: override.env,
+        providerId,
+        label: override.label ?? providerId,
+      }),
+  };
+}
+
 function addDerivedProviders(
   resolvedProviders: Map<string, ResolvedProvider>,
   providerOverrides: Record<string, ProviderOverride>,
@@ -550,47 +632,12 @@ function addDerivedProviders(
     }
 
     if (override.extends === "acp") {
-      if (!override.command || !isNonEmptyStringArray(override.command)) {
-        throw new Error(`ACP provider '${providerId}' requires a command`);
-      }
-      // Capture command in const for closure - TypeScript can't track type refinement inside closures
-      const command = override.command;
+      resolvedProviders.set(providerId, buildAcpDerivedProvider(providerId, override));
+      continue;
+    }
 
-      resolvedProviders.set(providerId, {
-        definition: createDerivedDefinition(
-          providerId,
-          {
-            id: providerId,
-            label: override.label ?? providerId,
-            description: override.description ?? "Custom ACP provider",
-            defaultModeId: null,
-            modes: [],
-          },
-          override,
-        ),
-        runtimeSettings: toRuntimeSettings(override),
-        profileModels: override.models ?? [],
-        additionalModels: override.additionalModels ?? [],
-        profileModelsAreAdditive: false,
-        enabled: override.enabled !== false,
-        derivedFromProviderId: null,
-        createBaseClient: (logger) =>
-          providerId === "cursor"
-            ? new CursorACPAgentClient({
-                logger,
-                command,
-                env: override.env,
-                providerId,
-                label: override.label ?? providerId,
-              })
-            : new GenericACPAgentClient({
-                logger,
-                command,
-                env: override.env,
-                providerId,
-                label: override.label ?? providerId,
-              }),
-      });
+    if (override.extends === "terminal") {
+      resolvedProviders.set(providerId, buildTerminalDerivedProvider(providerId, override));
       continue;
     }
 
