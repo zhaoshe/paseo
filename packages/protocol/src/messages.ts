@@ -123,6 +123,9 @@ const MutableWorktreesConfigSchema = z
     // Resolved default root ($PASEO_HOME/worktrees), read-only display value the
     // daemon fills in so clients can show where worktrees land when no custom root is set.
     defaultRoot: z.string().default(""),
+    // Currently active base root (the resolved path the running daemon is using right now).
+    // Read-only from server; does not change until daemon restarts.
+    activeRoot: z.string().default(""),
   })
   .passthrough();
 
@@ -1047,6 +1050,11 @@ export const SetDaemonConfigRequestMessageSchema = z.object({
   config: MutableDaemonConfigPatchSchema,
 });
 
+export const MigrateWorktreesRequestMessageSchema = z.object({
+  type: z.literal("worktrees.migrate.request"),
+  requestId: z.string(),
+});
+
 export const ReadProjectConfigRequestMessageSchema = z.object({
   type: z.literal("read_project_config_request"),
   requestId: z.string(),
@@ -1884,6 +1892,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   DaemonGetPairingOfferRequestSchema,
   GetDaemonConfigRequestMessageSchema,
   SetDaemonConfigRequestMessageSchema,
+  MigrateWorktreesRequestMessageSchema,
   ReadProjectConfigRequestMessageSchema,
   WriteProjectConfigRequestMessageSchema,
   DictationStreamStartMessageSchema,
@@ -2160,6 +2169,8 @@ export const ServerInfoStatusPayloadSchema = z
         checkoutRefresh: z.boolean().optional(),
         // COMPAT(configurableWorktreesRoot): added in v0.1.94, remove gate after 2026-12-11.
         configurableWorktreesRoot: z.boolean().optional(),
+        // COMPAT(worktreesMigration): added in v0.1.94, remove gate after 2026-12-11.
+        worktreesMigration: z.boolean().optional(),
       })
       .optional(),
   })
@@ -2824,6 +2835,17 @@ export const SetDaemonConfigResponseMessageSchema = z.object({
     .object({
       requestId: z.string(),
       config: MutableDaemonConfigSchema,
+    })
+    .passthrough(),
+});
+
+export const MigrateWorktreesResponseMessageSchema = z.object({
+  type: z.literal("worktrees.migrate.response"),
+  payload: z
+    .object({
+      requestId: z.string(),
+      movedCount: z.number(),
+      errors: z.array(z.string()),
     })
     .passthrough(),
 });
@@ -3759,6 +3781,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   DaemonGetPairingOfferResponseSchema,
   GetDaemonConfigResponseMessageSchema,
   SetDaemonConfigResponseMessageSchema,
+  MigrateWorktreesResponseMessageSchema,
   ReadProjectConfigResponseMessageSchema,
   WriteProjectConfigResponseMessageSchema,
   SetAgentModeResponseMessageSchema,

@@ -1065,6 +1065,8 @@ export class VoiceAssistantWebSocketServer {
         checkoutRefresh: true,
         // COMPAT(configurableWorktreesRoot): added in v0.1.94, remove gate after 2026-12-11.
         configurableWorktreesRoot: true,
+        // COMPAT(worktreesMigration): added in v0.1.94, remove gate after 2026-12-11.
+        worktreesMigration: true,
       },
     };
   }

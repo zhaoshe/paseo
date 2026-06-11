@@ -224,7 +224,7 @@ function makeConfig(providers: MutableDaemonConfig["providers"] = {}): MutableDa
     metadataGeneration: { providers: [] },
     autoArchiveAfterMerge: false,
     appendSystemPrompt: "",
-    worktrees: { root: "", defaultRoot: "" },
+    worktrees: { root: "", defaultRoot: "", activeRoot: "" },
   };
 }
 

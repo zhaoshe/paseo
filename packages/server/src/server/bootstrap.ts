@@ -89,6 +89,7 @@ function formatListenTarget(listenTarget: ListenTarget | null): string | null {
 import { VoiceAssistantWebSocketServer } from "./websocket-server.js";
 import { createGitHubService } from "../services/github-service.js";
 import { createPaseoWorktree as createRegisteredPaseoWorktree } from "./paseo-worktree-service.js";
+import { resolvePaseoWorktreesBaseRoot } from "../utils/worktree.js";
 import { createPaseoWorktreeWorkflow } from "./worktree-session.js";
 import { DownloadTokenStore } from "./file-download/token-store.js";
 import type { OpenAiSpeechProviderConfig } from "./speech/providers/openai/config.js";
@@ -313,6 +314,10 @@ export async function createPaseoDaemon(
       worktrees: {
         root: config.worktreesRoot ?? "",
         defaultRoot: path.join(config.paseoHome, "worktrees"),
+        activeRoot: resolvePaseoWorktreesBaseRoot({
+          paseoHome: config.paseoHome,
+          worktreesRoot: config.worktreesRoot,
+        }),
       },
     },
     logger,

@@ -256,6 +256,7 @@ import {
   handleWorkspaceSetupStatusRequest as handleWorkspaceSetupStatusRequestMessage,
 } from "./worktree-session.js";
 import { toWorktreeWireError } from "./worktree-errors.js";
+import { migrateWorktreesBaseRoot } from "../utils/migrate-worktrees.js";
 import { CreateAgentLifecycleDispatch } from "./agent/create-agent-lifecycle-dispatch.js";
 
 const WORKSPACE_GIT_WATCH_REMOVED_STATE_KEY = "__removed__";
@@ -1899,6 +1900,8 @@ export class Session {
           },
         });
         return undefined;
+      case "worktrees.migrate.request":
+        return this.handleMigrateWorktreesRequest(msg);
       case "read_project_config_request":
         return this.handleReadProjectConfigRequest(msg);
       case "write_project_config_request":
@@ -1906,6 +1909,33 @@ export class Session {
       default:
         return undefined;
     }
+  }
+
+  private async handleMigrateWorktreesRequest(
+    msg: Extract<SessionInboundMessage, { type: "worktrees.migrate.request" }>,
+  ): Promise<void> {
+    const liveConfig = this.daemonConfigStore.get();
+    const worktrees = liveConfig.worktrees;
+    const activeRoot = worktrees?.activeRoot ?? "";
+    const pendingRoot = worktrees?.root?.trim() || (worktrees?.defaultRoot ?? "");
+
+    if (!activeRoot || !pendingRoot || activeRoot === pendingRoot) {
+      this.emit({
+        type: "worktrees.migrate.response",
+        payload: { requestId: msg.requestId, movedCount: 0, errors: [] },
+      });
+      return;
+    }
+
+    const result = await migrateWorktreesBaseRoot(activeRoot, pendingRoot);
+    this.sessionLogger.info(
+      { fromBase: activeRoot, toBase: pendingRoot, movedCount: result.movedCount },
+      "Worktrees migration complete",
+    );
+    this.emit({
+      type: "worktrees.migrate.response",
+      payload: { requestId: msg.requestId, ...result },
+    });
   }
 
   private async handleReadProjectConfigRequest(

@@ -3546,6 +3546,19 @@ export class DaemonClient {
     });
   }
 
+  async migrateWorktrees(
+    requestId?: string,
+  ): Promise<{ requestId: string; movedCount: number; errors: string[] }> {
+    return this.sendCorrelatedSessionRequest({
+      requestId,
+      message: {
+        type: "worktrees.migrate.request",
+      },
+      responseType: "worktrees.migrate.response",
+      timeout: 60000,
+    });
+  }
+
   async readProjectConfig(repoRoot: string, requestId?: string): Promise<ReadProjectConfigPayload> {
     return this.sendCorrelatedSessionRequest({
       requestId,
