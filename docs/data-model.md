@@ -148,7 +148,10 @@ Single file, validated with `PersistedConfigSchema`.
     baseUrl: string
   },
   worktrees?: {
-    root?: string            // optional root for new worktrees; defaults to $PASEO_HOME/worktrees
+    // Optional root for new worktrees; defaults to $PASEO_HOME/worktrees.
+    // Editable from the app under Host settings > Workspaces > Worktree location
+    // (round-trips through MutableDaemonConfig.worktrees.root). Takes effect on daemon restart.
+    root?: string
   },
   providers: {
     openai: { apiKey: string },

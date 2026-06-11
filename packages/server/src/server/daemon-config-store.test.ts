@@ -141,6 +141,55 @@ describe("DaemonConfigStore", () => {
     expect(persisted.daemon?.appendSystemPrompt).toBe("Prefer terse replies.");
   });
 
+  test("patch persists worktrees root into config.json", () => {
+    const paseoHome = mkdtempSync(path.join(tmpdir(), "paseo-daemon-config-store-"));
+    tempDirs.push(paseoHome);
+
+    const store = new DaemonConfigStore(
+      paseoHome,
+      {
+        mcp: { injectIntoAgents: false },
+        providers: {},
+        metadataGeneration: { providers: [] },
+        autoArchiveAfterMerge: false,
+        appendSystemPrompt: "",
+        worktrees: { root: "", defaultRoot: path.join(paseoHome, "worktrees") },
+      },
+      undefined,
+    );
+
+    store.patch({
+      worktrees: { root: "~/code/worktrees" },
+    });
+
+    const persisted = loadPersistedConfig(paseoHome);
+    expect(persisted.worktrees?.root).toBe("~/code/worktrees");
+  });
+
+  test("clearing worktrees root removes it from config.json", () => {
+    const paseoHome = mkdtempSync(path.join(tmpdir(), "paseo-daemon-config-store-"));
+    tempDirs.push(paseoHome);
+
+    const store = new DaemonConfigStore(
+      paseoHome,
+      {
+        mcp: { injectIntoAgents: false },
+        providers: {},
+        metadataGeneration: { providers: [] },
+        autoArchiveAfterMerge: false,
+        appendSystemPrompt: "",
+        worktrees: { root: "", defaultRoot: path.join(paseoHome, "worktrees") },
+      },
+      undefined,
+    );
+
+    store.patch({ worktrees: { root: "/tmp/custom-worktrees" } });
+    expect(loadPersistedConfig(paseoHome).worktrees?.root).toBe("/tmp/custom-worktrees");
+
+    store.patch({ worktrees: { root: "   " } });
+    expect(loadPersistedConfig(paseoHome).worktrees).toBeUndefined();
+  });
+
   test("patch persists provider additional models into config.json", () => {
     const paseoHome = mkdtempSync(path.join(tmpdir(), "paseo-daemon-config-store-"));
     tempDirs.push(paseoHome);

@@ -116,6 +116,16 @@ const MutableMetadataGenerationConfigSchema = z
   })
   .passthrough();
 
+const MutableWorktreesConfigSchema = z
+  .object({
+    // Custom root for new Paseo worktrees. Empty string means "use the default".
+    root: z.string().default(""),
+    // Resolved default root ($PASEO_HOME/worktrees), read-only display value the
+    // daemon fills in so clients can show where worktrees land when no custom root is set.
+    defaultRoot: z.string().default(""),
+  })
+  .passthrough();
+
 export const MutableDaemonConfigSchema = z
   .object({
     mcp: z
@@ -127,6 +137,7 @@ export const MutableDaemonConfigSchema = z
     metadataGeneration: MutableMetadataGenerationConfigSchema.default({ providers: [] }),
     autoArchiveAfterMerge: z.boolean().default(false),
     appendSystemPrompt: z.string().default(""),
+    worktrees: MutableWorktreesConfigSchema.default({ root: "", defaultRoot: "" }),
   })
   .passthrough();
 
@@ -139,6 +150,8 @@ export const MutableDaemonConfigPatchSchema = z
     metadataGeneration: MutableMetadataGenerationConfigSchema.partial().optional(),
     autoArchiveAfterMerge: z.boolean().optional(),
     appendSystemPrompt: z.string().optional(),
+    // Only `root` is patchable; `defaultRoot` is daemon-derived and ignored on write.
+    worktrees: z.object({ root: z.string() }).partial().passthrough().optional(),
   })
   .partial()
   .passthrough();
@@ -2145,6 +2158,8 @@ export const ServerInfoStatusPayloadSchema = z
         rewind: z.boolean().optional(),
         // COMPAT(checkoutRefresh): added in v0.1.86, remove gate after 2026-11-29.
         checkoutRefresh: z.boolean().optional(),
+        // COMPAT(configurableWorktreesRoot): added in v0.1.94, remove gate after 2026-12-11.
+        configurableWorktreesRoot: z.boolean().optional(),
       })
       .optional(),
   })

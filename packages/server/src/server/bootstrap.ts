@@ -310,6 +310,10 @@ export async function createPaseoDaemon(
       },
       autoArchiveAfterMerge: config.autoArchiveAfterMerge ?? false,
       appendSystemPrompt: config.appendSystemPrompt ?? "",
+      worktrees: {
+        root: config.worktreesRoot ?? "",
+        defaultRoot: path.join(config.paseoHome, "worktrees"),
+      },
     },
     logger,
   );

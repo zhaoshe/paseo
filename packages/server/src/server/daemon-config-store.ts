@@ -200,6 +200,8 @@ function mergeMutableConfigIntoPersistedConfig(params: {
     } as PersistedConfig["agents"];
   }
 
+  const worktreesRoot = readWorktreesRoot(mutable);
+
   return {
     ...persisted,
     daemon: {
@@ -212,7 +214,23 @@ function mergeMutableConfigIntoPersistedConfig(params: {
       appendSystemPrompt: mutable.appendSystemPrompt,
     },
     agents: nextAgents,
+    // Empty root means "use the default" — drop the key so config.json stays clean
+    // and the resolver falls back to $PASEO_HOME/worktrees.
+    worktrees: worktreesRoot ? { root: worktreesRoot } : undefined,
   } as PersistedConfig;
+}
+
+function readWorktreesRoot(mutable: MutableDaemonConfig): string | undefined {
+  const worktrees = mutable.worktrees;
+  if (!isRecord(worktrees)) {
+    return undefined;
+  }
+  const root = worktrees["root"];
+  if (typeof root !== "string") {
+    return undefined;
+  }
+  const trimmed = root.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
 }
 
 function readMetadataGenerationProviders(

@@ -1,8 +1,9 @@
 import { ChevronRight, Globe, Monitor, Pencil, RotateCw, Trash2 } from "lucide-react-native";
 import type { TFunction } from "i18next";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
 import { useTranslation } from "react-i18next";
-import { Alert, Pressable, Text, View } from "react-native";
+import { Alert, Pressable, Text, TextInput, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { AdaptiveModalSheet, type SheetHeader } from "@/components/adaptive-modal-sheet";
 import { AdaptiveRenameModal } from "@/components/rename-modal";
@@ -230,6 +231,7 @@ export function HostWorkspacesPage({ serverId }: { serverId: string }) {
       {isConnected ? (
         <SettingsSection title={t("settings.hostSections.workspaces")}>
           <AutoArchiveMergedWorkspacesCard serverId={serverId} />
+          <WorktreeLocationCard serverId={serverId} />
         </SettingsSection>
       ) : (
         <View style={EMPTY_CARD_STYLE}>
@@ -715,6 +717,137 @@ function AutoArchiveMergedWorkspacesCard({ serverId }: { serverId: string }) {
   );
 }
 
+function WorktreeLocationCard({ serverId }: { serverId: string }) {
+  const { theme } = useUnistyles();
+  const isConnected = useHostRuntimeIsConnected(serverId);
+  // COMPAT(configurableWorktreesRoot): hosts older than v0.1.94 ignore the patch, so hide
+  // the control rather than offer a setting that silently no-ops. Drop after 2026-12-11.
+  const supportsConfigurableRoot = useSessionStore(
+    (state) => state.sessions[serverId]?.serverInfo?.features?.configurableWorktreesRoot === true,
+  );
+  const { config, patchConfig } = useDaemonConfig(serverId);
+  const customRoot = config?.worktrees?.root ?? "";
+  const defaultRoot = config?.worktrees?.defaultRoot ?? "";
+  const effectiveRoot = customRoot.trim() || defaultRoot;
+
+  const [draft, setDraft] = useState(customRoot);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const header = useMemo<SheetHeader>(() => ({ title: "Worktree location" }), []);
+
+  useEffect(() => {
+    setDraft(customRoot);
+  }, [customRoot]);
+
+  const hasChanges = draft.trim() !== customRoot.trim();
+
+  const handleOpen = useCallback(() => {
+    setDraft(customRoot);
+    setIsEditing(true);
+  }, [customRoot]);
+
+  const handleClose = useCallback(() => {
+    if (isSaving) return;
+    setDraft(customRoot);
+    setIsEditing(false);
+  }, [isSaving, customRoot]);
+
+  const handleSave = useCallback(() => {
+    setIsSaving(true);
+    void patchConfig({ worktrees: { root: draft.trim() } })
+      .then(() => {
+        setIsEditing(false);
+        return;
+      })
+      .catch((error) => {
+        console.error("[HostPage] Failed to save worktree location", error);
+        Alert.alert(
+          "Unable to update worktree location",
+          error instanceof Error ? error.message : String(error),
+        );
+      })
+      .finally(() => setIsSaving(false));
+  }, [draft, patchConfig]);
+
+  const handleReset = useCallback(() => {
+    setDraft(customRoot);
+  }, [customRoot]);
+
+  if (!isConnected || !supportsConfigurableRoot) return null;
+
+  return (
+    <>
+      <View style={settingsStyles.card} testID="host-page-worktree-location-card">
+        <View style={settingsStyles.row}>
+          <View style={settingsStyles.rowContent}>
+            <Text style={settingsStyles.rowTitle}>Worktree location</Text>
+            <Text style={settingsStyles.rowHint} numberOfLines={1}>
+              {effectiveRoot || "Default location"}
+            </Text>
+          </View>
+          <Button
+            variant="outline"
+            size="sm"
+            onPress={handleOpen}
+            testID="host-page-worktree-location-edit"
+          >
+            Edit
+          </Button>
+        </View>
+      </View>
+
+      {isEditing ? (
+        <AdaptiveModalSheet
+          header={header}
+          visible
+          onClose={handleClose}
+          testID="host-page-worktree-location-sheet"
+          desktopMaxWidth={560}
+        >
+          <View style={settingsStyles.card}>
+            <TextInput
+              testID="host-page-worktree-location-input"
+              accessibilityLabel="Worktree location"
+              value={draft}
+              onChangeText={setDraft}
+              placeholder={defaultRoot || "/path/to/worktrees"}
+              placeholderTextColor={theme.colors.foregroundMuted}
+              autoCapitalize="none"
+              autoCorrect={false}
+              spellCheck={false}
+              style={styles.worktreeLocationInput}
+            />
+          </View>
+          <Text style={styles.worktreeLocationHint}>
+            New worktrees are created here. Leave empty to use the default
+            {defaultRoot ? ` (${defaultRoot})` : ""}. Restart the host to apply changes.
+          </Text>
+          <View style={styles.appendPromptActions}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onPress={handleReset}
+              disabled={!hasChanges || isSaving}
+              testID="host-page-worktree-location-reset"
+            >
+              Reset
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              onPress={handleSave}
+              disabled={!hasChanges || isSaving}
+              testID="host-page-worktree-location-save"
+            >
+              {isSaving ? "Saving..." : "Save"}
+            </Button>
+          </View>
+        </AdaptiveModalSheet>
+      ) : null}
+    </>
+  );
+}
+
 function AppendSystemPromptCard({ serverId }: { serverId: string }) {
   const { t } = useTranslation();
   const isConnected = useHostRuntimeIsConnected(serverId);
@@ -1125,6 +1258,18 @@ const styles = StyleSheet.create((theme) => ({
     flexDirection: "row",
     justifyContent: "flex-end",
     gap: theme.spacing[2],
+  },
+  worktreeLocationInput: {
+    color: theme.colors.foreground,
+    fontSize: theme.fontSize.sm,
+    paddingVertical: theme.spacing[3],
+    paddingHorizontal: theme.spacing[4],
+  },
+  worktreeLocationHint: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.sm,
+    marginTop: theme.spacing[2],
+    paddingHorizontal: theme.spacing[1],
   },
   emptyCard: {
     padding: theme.spacing[4],
