@@ -303,6 +303,7 @@ This ensures the checkout ref matches the actual code on `main` with the fix inc
 - `version:all:*` bumps root + syncs workspace versions and `@getpaseo/*` dependency versions
 - `release:prepare` refreshes workspace `node_modules` links to prevent stale types
 - `npm run dev:desktop` and `npm run build:desktop` target the Electron desktop package in `packages/desktop`
+- Local macOS builds without a Developer ID identity are re-signed in `after-sign.js` with library validation disabled for the app and Electron helpers. macOS 26 otherwise rejects the ad-hoc app and framework as having different Team IDs at launch. Developer ID builds keep normal library validation.
 - If `release:publish` partially fails, re-run it — npm skips already-published versions
 - If `release:publish:beta` partially fails, re-run it — npm skips already-published versions and keeps prereleases off `latest` because every publish uses `--tag beta`
 - The website uses GitHub's latest published release API for download links, so published beta prereleases do not replace the stable download target.
