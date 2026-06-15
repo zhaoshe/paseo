@@ -1633,6 +1633,7 @@ export const en = {
         restart: {
           title: "Restart daemon",
           hint: "Restarts the daemon process. The app will reconnect automatically",
+          confirm: "Restart",
           confirmTitle: "Restart {{name}}",
           confirmMessage:
             "This will restart the daemon. Agents running on it will keep going; the app will reconnect automatically.",

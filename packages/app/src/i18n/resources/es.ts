@@ -1663,6 +1663,7 @@ export const es: TranslationResources = {
         restart: {
           title: "Reiniciar demonio",
           hint: "Reinicia el proceso del demonio. La aplicación se volverá a conectar automáticamente",
+          confirm: "Reiniciar",
           confirmTitle: "Reiniciar{{name}}",
           confirmMessage:
             "Esto reiniciará el demonio. Los agentes que se ejecutan en él seguirán funcionando; la aplicación se volverá a conectar automáticamente.",

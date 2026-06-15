@@ -1608,6 +1608,7 @@ export const zhCN: TranslationResources = {
         restart: {
           title: "重启 Daemon",
           hint: "重启 Daemon 进程。应用会自动重新连接",
+          confirm: "重启",
           confirmTitle: "重启 {{name}}",
           confirmMessage: "这会重启 Daemon。其上运行的 Agent 会继续运行；应用会自动重新连接。",
           restarting: "正在重启...",

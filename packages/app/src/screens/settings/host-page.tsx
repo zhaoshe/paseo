@@ -717,6 +717,62 @@ function AutoArchiveMergedWorkspacesCard({ serverId }: { serverId: string }) {
   );
 }
 
+type MigrationStatus =
+  | { kind: "done"; movedCount: number }
+  | { kind: "error"; message: string }
+  | null;
+
+function useMigrateWorktrees(serverId: string) {
+  const client = useHostRuntimeClient(serverId);
+  const [isMigrating, setIsMigrating] = useState(false);
+  const [status, setStatus] = useState<MigrationStatus>(null);
+
+  const handleMigrate = useCallback(() => {
+    if (!client || isMigrating) return;
+    setIsMigrating(true);
+    setStatus(null);
+    void client
+      .migrateWorktrees()
+      .then((result) => {
+        if (result.errors.length > 0) {
+          setStatus({ kind: "error", message: result.errors.join("\n") });
+        } else {
+          setStatus({ kind: "done", movedCount: result.movedCount });
+        }
+        return;
+      })
+      .catch((error) => {
+        setStatus({
+          kind: "error",
+          message: error instanceof Error ? error.message : String(error),
+        });
+      })
+      .finally(() => setIsMigrating(false));
+  }, [client, isMigrating]);
+
+  const handleRestart = useCallback(
+    (onAfterDispatch?: () => void) => {
+      void confirmDialog({
+        title: "Restart host",
+        message: "Restart the daemon to use the new worktree location.",
+        confirmLabel: "Restart",
+        cancelLabel: "Cancel",
+        destructive: true,
+      })
+        .then((confirmed) => {
+          if (!confirmed) return;
+          void client?.restartServer("worktree_location_restart");
+          onAfterDispatch?.();
+          return;
+        })
+        .catch(console.error);
+    },
+    [client],
+  );
+
+  return { isMigrating, status, handleMigrate, handleRestart };
+}
+
 function WorktreeLocationMigrateBanner({
   serverId,
   activeRoot,
@@ -726,42 +782,53 @@ function WorktreeLocationMigrateBanner({
   activeRoot: string;
   pendingRoot: string;
 }) {
-  const client = useHostRuntimeClient(serverId);
-  const [isMigrating, setIsMigrating] = useState(false);
+  const { isMigrating, status, handleMigrate, handleRestart } = useMigrateWorktrees(serverId);
 
-  const handleMigrate = useCallback(() => {
-    if (!client || isMigrating) return;
-    setIsMigrating(true);
-    void client
-      .migrateWorktrees()
-      .then((result) => {
-        if (result.errors.length > 0) {
-          Alert.alert(
-            `Migrated ${result.movedCount} worktree${result.movedCount !== 1 ? "s" : ""} with errors`,
-            result.errors.join("\n"),
-          );
-        } else {
-          Alert.alert(
-            "Migration complete",
-            result.movedCount === 0
-              ? "No worktrees needed moving."
-              : `Moved ${result.movedCount} worktree${result.movedCount !== 1 ? "s" : ""} to ${pendingRoot}.`,
-          );
-        }
-        return;
-      })
-      .catch((error) => {
-        console.error("[HostPage] Worktree migration failed", error);
-        Alert.alert("Migration failed", error instanceof Error ? error.message : String(error));
-      })
-      .finally(() => setIsMigrating(false));
-  }, [client, isMigrating, pendingRoot]);
+  const handleRestartPress = useCallback(() => {
+    handleRestart();
+  }, [handleRestart]);
+
+  if (status?.kind === "done") {
+    return (
+      <View style={styles.migrateBannerRow}>
+        <Text style={styles.migrateBannerDoneHint}>
+          {status.movedCount === 0
+            ? "No worktrees to move — restart to apply new location."
+            : `Moved ${status.movedCount} worktree${status.movedCount !== 1 ? "s" : ""} — restart to apply.`}
+        </Text>
+        <Button variant="outline" size="sm" onPress={handleRestartPress}>
+          Restart
+        </Button>
+      </View>
+    );
+  }
+
+  let migrateLabel = "Migrate";
+  if (isMigrating) {
+    migrateLabel = "Migrating…";
+  } else if (status?.kind === "error") {
+    migrateLabel = "Retry";
+  }
 
   return (
-    <View style={styles.migrateBanner}>
-      <Text style={styles.migrateBannerText} numberOfLines={2}>
-        Existing worktrees at {activeRoot} — move them to the new location before restarting.
-      </Text>
+    <View style={styles.migrateBannerRow}>
+      <View style={settingsStyles.rowContent}>
+        <Text style={styles.migrateBannerTitle}>Worktrees at old location</Text>
+        {status?.kind === "error" ? (
+          <Text style={styles.migrateBannerError} numberOfLines={2}>
+            {status.message}
+          </Text>
+        ) : (
+          <>
+            <Text style={styles.migrateBannerHint} numberOfLines={1}>
+              From: {activeRoot}
+            </Text>
+            <Text style={styles.migrateBannerHint} numberOfLines={1}>
+              To: {pendingRoot}
+            </Text>
+          </>
+        )}
+      </View>
       <Button
         variant="outline"
         size="sm"
@@ -769,20 +836,100 @@ function WorktreeLocationMigrateBanner({
         disabled={isMigrating}
         testID="host-page-worktree-location-migrate"
       >
-        {isMigrating ? "Migrating…" : "Migrate"}
+        {migrateLabel}
       </Button>
     </View>
+  );
+}
+
+function WorktreeMigrateModal({
+  serverId,
+  activeRoot,
+  pendingRoot,
+  onClose,
+}: {
+  serverId: string;
+  activeRoot: string;
+  pendingRoot: string;
+  onClose: () => void;
+}) {
+  const { isMigrating, status, handleMigrate, handleRestart } = useMigrateWorktrees(serverId);
+  const header = useMemo<SheetHeader>(() => ({ title: "Worktree location changed" }), []);
+  const canMigrate = Boolean(activeRoot && activeRoot !== pendingRoot);
+
+  const handleRestartPress = useCallback(() => {
+    handleRestart(onClose);
+  }, [handleRestart, onClose]);
+
+  return (
+    <AdaptiveModalSheet header={header} visible onClose={onClose} desktopMaxWidth={500}>
+      <View style={settingsStyles.card}>
+        {status?.kind === "done" ? (
+          <View style={settingsStyles.row}>
+            <Text style={styles.migrateBannerDoneHint}>
+              {status.movedCount === 0
+                ? "No worktrees to move — restart to apply new location."
+                : `Moved ${status.movedCount} worktree${status.movedCount !== 1 ? "s" : ""} — restart to apply.`}
+            </Text>
+            <Button variant="outline" size="sm" onPress={handleRestartPress}>
+              Restart
+            </Button>
+          </View>
+        ) : (
+          <View style={settingsStyles.row}>
+            <View style={settingsStyles.rowContent}>
+              {canMigrate ? (
+                <>
+                  <Text style={settingsStyles.rowTitle}>Move existing worktrees?</Text>
+                  <Text style={styles.migrateBannerHint} numberOfLines={1}>
+                    From: {activeRoot}
+                  </Text>
+                  <Text style={styles.migrateBannerHint} numberOfLines={1}>
+                    To: {pendingRoot}
+                  </Text>
+                </>
+              ) : (
+                <Text style={settingsStyles.rowTitle}>New location saved</Text>
+              )}
+            </View>
+            {canMigrate ? (
+              <Button variant="outline" size="sm" onPress={handleMigrate} disabled={isMigrating}>
+                {isMigrating ? "Moving…" : "Move"}
+              </Button>
+            ) : (
+              <Button variant="outline" size="sm" onPress={handleRestartPress}>
+                Restart
+              </Button>
+            )}
+          </View>
+        )}
+        {status?.kind === "error" ? (
+          <View style={styles.migrateBannerRow}>
+            <Text style={styles.migrateBannerError}>{status.message}</Text>
+          </View>
+        ) : null}
+      </View>
+      {status?.kind !== "done" && canMigrate ? (
+        <Text style={styles.worktreeLocationHint}>
+          Existing worktrees will be moved to the new location. Restart the host to apply.
+        </Text>
+      ) : null}
+    </AdaptiveModalSheet>
   );
 }
 
 function WorktreeLocationEditSheet({
   customRoot,
   defaultRoot,
+  disabled = false,
   patchConfig,
+  onSaved,
 }: {
   customRoot: string;
   defaultRoot: string;
+  disabled?: boolean;
   patchConfig: (patch: { worktrees: { root: string } }) => Promise<unknown>;
+  onSaved?: (newRoot: string) => void;
 }) {
   const { theme } = useUnistyles();
   const [draft, setDraft] = useState(customRoot);
@@ -795,6 +942,7 @@ function WorktreeLocationEditSheet({
   }, [customRoot]);
 
   const hasChanges = draft.trim() !== customRoot.trim();
+  const isAlreadyDefault = customRoot === "" && draft.trim() === "";
 
   const handleOpen = useCallback(() => {
     setDraft(customRoot);
@@ -809,9 +957,11 @@ function WorktreeLocationEditSheet({
 
   const handleSave = useCallback(() => {
     setIsSaving(true);
-    void patchConfig({ worktrees: { root: draft.trim() } })
+    const newRoot = draft.trim();
+    void patchConfig({ worktrees: { root: newRoot } })
       .then(() => {
         setIsEditing(false);
+        onSaved?.(newRoot);
         return;
       })
       .catch((error) => {
@@ -822,11 +972,25 @@ function WorktreeLocationEditSheet({
         );
       })
       .finally(() => setIsSaving(false));
-  }, [draft, patchConfig]);
+  }, [draft, patchConfig, onSaved]);
 
-  const handleReset = useCallback(() => {
-    setDraft(customRoot);
-  }, [customRoot]);
+  const handleResetToDefault = useCallback(() => {
+    setIsSaving(true);
+    void patchConfig({ worktrees: { root: "" } })
+      .then(() => {
+        setIsEditing(false);
+        onSaved?.("");
+        return;
+      })
+      .catch((error) => {
+        console.error("[HostPage] Failed to reset worktree location to default", error);
+        Alert.alert(
+          "Unable to reset worktree location",
+          error instanceof Error ? error.message : String(error),
+        );
+      })
+      .finally(() => setIsSaving(false));
+  }, [patchConfig, onSaved]);
 
   return (
     <>
@@ -834,6 +998,7 @@ function WorktreeLocationEditSheet({
         variant="outline"
         size="sm"
         onPress={handleOpen}
+        disabled={disabled}
         testID="host-page-worktree-location-edit"
       >
         Edit
@@ -868,17 +1033,17 @@ function WorktreeLocationEditSheet({
             <Button
               variant="ghost"
               size="sm"
-              onPress={handleReset}
-              disabled={!hasChanges || isSaving}
+              onPress={handleResetToDefault}
+              disabled={isAlreadyDefault || isSaving}
               testID="host-page-worktree-location-reset"
             >
-              Reset
+              Reset to default
             </Button>
             <Button
               variant="default"
               size="sm"
               onPress={handleSave}
-              disabled={!hasChanges || isSaving}
+              disabled={!hasChanges || draft.trim() === "" || isSaving}
               testID="host-page-worktree-location-save"
             >
               {isSaving ? "Saving..." : "Save"}
@@ -888,6 +1053,20 @@ function WorktreeLocationEditSheet({
       ) : null}
     </>
   );
+}
+
+function resolveWorktreeRoots(config: ReturnType<typeof useDaemonConfig>["config"]): {
+  customRoot: string;
+  defaultRoot: string;
+  activeRoot: string;
+  effectiveRoot: string;
+  pendingRoot: string;
+} {
+  const customRoot = config?.worktrees?.root ?? "";
+  const defaultRoot = config?.worktrees?.defaultRoot ?? "";
+  const activeRoot = config?.worktrees?.activeRoot ?? "";
+  const effectiveRoot = customRoot.trim() || defaultRoot;
+  return { customRoot, defaultRoot, activeRoot, effectiveRoot, pendingRoot: effectiveRoot };
 }
 
 function WorktreeLocationCard({ serverId }: { serverId: string }) {
@@ -901,12 +1080,29 @@ function WorktreeLocationCard({ serverId }: { serverId: string }) {
   const supportsWorktreesMigration = useSessionStore(
     (state) => state.sessions[serverId]?.serverInfo?.features?.worktreesMigration === true,
   );
-  const { config, patchConfig } = useDaemonConfig(serverId);
-  const customRoot = config?.worktrees?.root ?? "";
-  const defaultRoot = config?.worktrees?.defaultRoot ?? "";
-  const activeRoot = config?.worktrees?.activeRoot ?? "";
-  const effectiveRoot = customRoot.trim() || defaultRoot;
-  const pendingRoot = customRoot.trim() || defaultRoot;
+  const { config, isLoading, patchConfig } = useDaemonConfig(serverId);
+  // Until the config arrives, customRoot/defaultRoot read as "" — rendering
+  // "Default location" (or migration UI) from that empty state misleads the
+  // user into editing or migrating in the wrong direction.
+  const isConfigReady = !isLoading && config !== null;
+  const { customRoot, defaultRoot, activeRoot, effectiveRoot, pendingRoot } =
+    resolveWorktreeRoots(config);
+  const [showMigrateModal, setShowMigrateModal] = useState(false);
+
+  const handleSaved = useCallback(
+    (newRoot: string) => {
+      if (!supportsWorktreesMigration || !activeRoot) return;
+      const newPending = newRoot.trim() || defaultRoot;
+      if (activeRoot !== newPending) {
+        setShowMigrateModal(true);
+      }
+    },
+    [supportsWorktreesMigration, activeRoot, defaultRoot],
+  );
+
+  const handleCloseMigrateModal = useCallback(() => {
+    setShowMigrateModal(false);
+  }, []);
 
   if (!isConnected || !supportsConfigurableRoot) return null;
 
@@ -916,16 +1112,26 @@ function WorktreeLocationCard({ serverId }: { serverId: string }) {
         <View style={settingsStyles.rowContent}>
           <Text style={settingsStyles.rowTitle}>Worktree location</Text>
           <Text style={settingsStyles.rowHint} numberOfLines={1}>
-            {effectiveRoot || "Default location"}
+            {isConfigReady ? effectiveRoot || "Default location" : "Loading…"}
           </Text>
         </View>
         <WorktreeLocationEditSheet
           customRoot={customRoot}
           defaultRoot={defaultRoot}
+          disabled={!isConfigReady}
           patchConfig={patchConfig}
+          onSaved={handleSaved}
         />
       </View>
-      {supportsWorktreesMigration && activeRoot && activeRoot !== pendingRoot ? (
+      {showMigrateModal ? (
+        <WorktreeMigrateModal
+          serverId={serverId}
+          activeRoot={activeRoot}
+          pendingRoot={pendingRoot}
+          onClose={handleCloseMigrateModal}
+        />
+      ) : null}
+      {isConfigReady && supportsWorktreesMigration && activeRoot && activeRoot !== pendingRoot ? (
         <WorktreeLocationMigrateBanner
           serverId={serverId}
           activeRoot={activeRoot}
@@ -1359,19 +1565,34 @@ const styles = StyleSheet.create((theme) => ({
     marginTop: theme.spacing[2],
     paddingHorizontal: theme.spacing[1],
   },
-  migrateBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.spacing[3],
-    marginTop: theme.spacing[3],
-    paddingTop: theme.spacing[3],
+  migrateBannerRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "space-between" as const,
+    paddingVertical: theme.spacing[4],
+    paddingHorizontal: theme.spacing[4],
     borderTopWidth: 1,
     borderTopColor: theme.colors.border,
   },
-  migrateBannerText: {
-    flex: 1,
-    color: theme.colors.foregroundMuted,
+  migrateBannerTitle: {
+    color: theme.colors.foreground,
     fontSize: theme.fontSize.sm,
+  },
+  migrateBannerHint: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.xs,
+    marginTop: theme.spacing[1],
+  },
+  migrateBannerError: {
+    color: theme.colors.destructive,
+    fontSize: theme.fontSize.xs,
+    marginTop: theme.spacing[1],
+  },
+  migrateBannerDoneHint: {
+    flex: 1,
+    marginRight: theme.spacing[2],
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.xs,
   },
   emptyCard: {
     padding: theme.spacing[4],

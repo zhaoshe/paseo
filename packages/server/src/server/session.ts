@@ -2,7 +2,7 @@ import equal from "fast-deep-equal";
 import { v4 as uuidv4 } from "uuid";
 import { realpathSync } from "node:fs";
 import type { FSWatcher } from "node:fs";
-import { basename, resolve, sep } from "path";
+import { basename, join, resolve, sep } from "path";
 import { homedir } from "node:os";
 import { z } from "zod";
 import type { ToolSet } from "ai";
@@ -256,7 +256,11 @@ import {
   handleWorkspaceSetupStatusRequest as handleWorkspaceSetupStatusRequestMessage,
 } from "./worktree-session.js";
 import { toWorktreeWireError } from "./worktree-errors.js";
-import { migrateWorktreesBaseRoot } from "../utils/migrate-worktrees.js";
+import {
+  migrateAgentRecords,
+  migrateWorktreesBaseRoot,
+  migrateWorkspaceRegistry,
+} from "../utils/migrate-worktrees.js";
 import { CreateAgentLifecycleDispatch } from "./agent/create-agent-lifecycle-dispatch.js";
 
 const WORKSPACE_GIT_WATCH_REMOVED_STATE_KEY = "__removed__";
@@ -1928,13 +1932,39 @@ export class Session {
     }
 
     const result = await migrateWorktreesBaseRoot(activeRoot, pendingRoot);
+
+    // Only repoint records after the physical moves are committed; on a
+    // rolled-back failure the records must keep pointing at the old paths.
+    let agentErrors: string[] = [];
+    let workspaceErrors: string[] = [];
+    if (result.movesCommitted) {
+      const resolvedFrom = resolve(expandTilde(activeRoot));
+      const resolvedTo = resolve(expandTilde(pendingRoot));
+      const agentsBaseDir = join(this.paseoHome, "agents");
+      [agentErrors, workspaceErrors] = await Promise.all([
+        migrateAgentRecords(agentsBaseDir, resolvedFrom, resolvedTo),
+        migrateWorkspaceRegistry(this.workspaceRegistry, resolvedFrom, resolvedTo),
+      ]);
+    }
+
     this.sessionLogger.info(
-      { fromBase: activeRoot, toBase: pendingRoot, movedCount: result.movedCount },
+      {
+        fromBase: activeRoot,
+        toBase: pendingRoot,
+        movedCount: result.movedCount,
+        movesCommitted: result.movesCommitted,
+        recordsMigrated:
+          result.movesCommitted && agentErrors.length === 0 && workspaceErrors.length === 0,
+      },
       "Worktrees migration complete",
     );
     this.emit({
       type: "worktrees.migrate.response",
-      payload: { requestId: msg.requestId, ...result },
+      payload: {
+        requestId: msg.requestId,
+        movedCount: result.movedCount,
+        errors: [...result.errors, ...agentErrors, ...workspaceErrors],
+      },
     });
   }
 

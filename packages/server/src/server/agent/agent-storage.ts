@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { Logger } from "pino";
 
 import { writeJsonFileAtomic } from "../atomic-file.js";
+import { projectDirNameFromCwd } from "../../utils/project-dir-name.js";
 import { AgentFeatureSchema, AgentStatusSchema } from "../messages.js";
 import { toStoredAgentRecord } from "./agent-projections.js";
 import type { ManagedAgent } from "./agent-manager.js";
@@ -372,17 +373,4 @@ export class AgentStorage {
   private async waitForPendingWrite(agentId: string): Promise<void> {
     await (this.pendingWrites.get(agentId) ?? Promise.resolve()).catch(() => undefined);
   }
-}
-
-function projectDirNameFromCwd(cwd: string): string {
-  // path.win32.parse handles drive letters, UNC roots, and Unix roots on all platforms
-  const { root } = path.win32.parse(cwd);
-  const withoutRoot = cwd.slice(root.length).replace(/[\\/]+$/, "");
-  // Sanitize root: strip colons and separators, keep letters (e.g. "C:\" → "C", "\\server\share\" → "server-share")
-  const sanitizedRoot = root.replace(/[:\\/]+/g, "-").replace(/^-+|-+$/g, "");
-  const prefix = sanitizedRoot ? sanitizedRoot + "-" : "";
-  if (!withoutRoot) {
-    return sanitizedRoot || "root";
-  }
-  return prefix + withoutRoot.replace(/[\\/]+/g, "-");
 }

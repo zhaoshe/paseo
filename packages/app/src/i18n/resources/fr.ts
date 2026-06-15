@@ -1669,6 +1669,7 @@ export const fr: TranslationResources = {
         restart: {
           title: "Redémarrer le démon",
           hint: "Redémarre le processus démon. L'application se reconnectera automatiquement",
+          confirm: "Redémarrer",
           confirmTitle: "Redémarrer{{name}}",
           confirmMessage:
             "Cela redémarrera le démon. Les agents qui s'y exécutent continueront à fonctionner; l'application se reconnectera automatiquement.",

@@ -145,9 +145,31 @@ class FileBackedRegistry<TRecord extends RegistryRecord> {
     this.cache.clear();
     try {
       const raw = await fs.readFile(this.filePath, "utf8");
-      const parsed = z.array(this.schema).parse(JSON.parse(raw));
-      for (const record of parsed) {
-        this.cache.set(this.getId(record), record);
+      const parsed: unknown = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        throw new Error("registry file is not an array");
+      }
+      // Parse records individually: one malformed record must not wipe the whole
+      // registry — an empty cache cascades (e.g. reconciliation then archives
+      // every project as workspace-less and the sidebar goes blank).
+      let skipped = 0;
+      for (const value of parsed) {
+        const result = this.schema.safeParse(value);
+        if (result.success) {
+          this.cache.set(this.getId(result.data), result.data);
+        } else {
+          skipped += 1;
+          this.logger.error(
+            { err: result.error, filePath: this.filePath, record: value },
+            "Skipping malformed registry record",
+          );
+        }
+      }
+      if (skipped > 0) {
+        this.logger.warn(
+          { filePath: this.filePath, skipped, loaded: this.cache.size },
+          "Registry file loaded with malformed records skipped",
+        );
       }
     } catch (error) {
       const code = (error as NodeJS.ErrnoException).code;

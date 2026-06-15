@@ -1,6 +1,6 @@
 import express from "express";
 import { createServer as createHTTPServer, type IncomingMessage, type ServerResponse } from "http";
-import { constants, existsSync, unlinkSync } from "fs";
+import { constants, existsSync, mkdirSync, unlinkSync } from "fs";
 import { open } from "fs/promises";
 import { randomUUID } from "node:crypto";
 import { hostname as getHostname } from "node:os";
@@ -293,6 +293,13 @@ export async function createPaseoDaemon(
   const bootstrapStart = performance.now();
   const elapsed = () => `${(performance.now() - bootstrapStart).toFixed(0)}ms`;
   const daemonVersion = resolveDaemonVersion(import.meta.url);
+
+  // Ensure the worktrees root directory exists at startup so agents can create
+  // worktrees immediately without hitting a "no such file or directory" error.
+  if (config.worktreesRoot) {
+    mkdirSync(config.worktreesRoot, { recursive: true });
+  }
+
   const daemonConfigStore = new DaemonConfigStore(
     config.paseoHome,
     {

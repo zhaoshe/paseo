@@ -772,16 +772,30 @@ function deriveShortAlphanumericHash(value: string): string {
   return hashValue.toString(36).padStart(13, "0").slice(0, WORKTREE_PROJECT_HASH_LENGTH);
 }
 
-export async function deriveWorktreeProjectHash(cwd: string): Promise<string> {
+function sanitizeRepoNameForPath(name: string): string {
+  const sanitized = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return sanitized.length > 0 ? sanitized : "repo";
+}
+
+async function resolveCanonicalRepoRoot(cwd: string): Promise<string> {
   try {
     const commonDir = await getGitCommonDir(cwd);
     const normalizedCommonDir = normalizePathForOwnership(commonDir);
-    const repoRoot =
-      basename(normalizedCommonDir) === ".git" ? dirname(normalizedCommonDir) : normalizedCommonDir;
-    return deriveShortAlphanumericHash(repoRoot);
+    return basename(normalizedCommonDir) === ".git"
+      ? dirname(normalizedCommonDir)
+      : normalizedCommonDir;
   } catch {
-    return deriveShortAlphanumericHash(normalizePathForOwnership(cwd));
+    return normalizePathForOwnership(cwd);
   }
+}
+
+export async function deriveWorktreeProjectHash(cwd: string): Promise<string> {
+  const repoRoot = await resolveCanonicalRepoRoot(cwd);
+  const repoName = sanitizeRepoNameForPath(basename(repoRoot));
+  return `${repoName}-${deriveShortAlphanumericHash(repoRoot)}`;
 }
 
 export function resolvePaseoWorktreesBaseRoot(options?: WorktreeRootOptions): string {
@@ -804,8 +818,18 @@ export async function getPaseoWorktreesRoot(
   worktreesRoot?: string,
 ): Promise<string> {
   const baseRoot = resolvePaseoWorktreesBaseRoot({ paseoHome, worktreesRoot });
-  const projectHash = await deriveWorktreeProjectHash(cwd);
-  return join(baseRoot, projectHash);
+  const repoRoot = await resolveCanonicalRepoRoot(cwd);
+
+  // Legacy directories used only the hash (no repo-name prefix). If one exists on
+  // disk, keep routing to it so existing worktrees stay connected.
+  const legacyDir = join(baseRoot, deriveShortAlphanumericHash(repoRoot));
+  if (existsSync(legacyDir)) {
+    return legacyDir;
+  }
+
+  // New format: <repoName>-<hash> — readable and still collision-free.
+  const repoName = sanitizeRepoNameForPath(basename(repoRoot));
+  return join(baseRoot, `${repoName}-${deriveShortAlphanumericHash(repoRoot)}`);
 }
 
 export async function computeWorktreePath(

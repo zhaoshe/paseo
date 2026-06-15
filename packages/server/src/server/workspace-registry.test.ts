@@ -1,6 +1,6 @@
 import os from "node:os";
 import path from "node:path";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 
 import { beforeEach, afterEach, describe, expect, test } from "vitest";
 
@@ -179,5 +179,33 @@ describe("workspace registries", () => {
     await workspaceRegistry.remove("/tmp/repo");
     expect(await workspaceRegistry.get("/tmp/repo")).toBeNull();
     expect(await workspaceRegistry.list()).toEqual([]);
+  });
+
+  test("skips malformed records on load instead of wiping the registry", async () => {
+    const filePath = path.join(tmpDir, "projects", "workspaces.json");
+    mkdirSync(path.dirname(filePath), { recursive: true });
+    const valid = {
+      workspaceId: "/tmp/good",
+      projectId: "remote:github.com/acme/repo",
+      cwd: "/tmp/good",
+      kind: "local_checkout",
+      displayName: "main",
+      createdAt: "2026-03-01T00:00:00.000Z",
+      updatedAt: "2026-03-01T00:00:00.000Z",
+      archivedAt: null,
+    };
+    // archivedAt key missing — schema-invalid (required nullable, not optional).
+    const malformed = { ...valid, workspaceId: "/tmp/bad", cwd: "/tmp/bad" } as Record<
+      string,
+      unknown
+    >;
+    delete malformed.archivedAt;
+    writeFileSync(filePath, JSON.stringify([valid, malformed], null, 2) + "\n");
+
+    const registry = new FileBackedWorkspaceRegistry(filePath, logger);
+    const records = await registry.list();
+
+    expect(records).toHaveLength(1);
+    expect(records[0]?.workspaceId).toBe("/tmp/good");
   });
 });
