@@ -99,15 +99,18 @@ export const ar: TranslationResources = {
     },
     attachments: {
       addImage: "أضف صورة",
+      addFile: "Upload file",
       addIssueOrPr: "أضف مشكلة أو PR",
       dropImagesHere: "إسقاط الصور هنا",
+      dropFilesHere: "Drop files here",
       editQueuedMessage: "تحرير الرسالة في قائمة الانتظار",
       sendQueuedMessageNow: "إرسال رسالة في قائمة الانتظار الآن",
       openImage: "فتح مرفق الصورة",
       removeImage: "إزالة مرفق الصورة",
+      removeFile: "Remove file attachment",
       openGithub: "افتح{{kind}}#{{number}}",
       removeGithub: "إزالة{{kind}}#{{number}}",
-      browserElement: "العنصر ·{{tag}}",
+      element: "عنصر",
       openBrowserElement: "افتح مرفق عنصر المتصفح",
       removeBrowserElement: "إزالة مرفق عنصر المتصفح",
       openReview: "فتح مرفق المراجعة",
@@ -119,6 +122,8 @@ export const ar: TranslationResources = {
       noHostSelected: "لم يتم تحديد مضيف",
       initialPromptRequired: "مطلوب موجه الأولي",
       alreadyLoading: "جارٍ التحميل بالفعل",
+      uploadFailed: "Failed to upload file",
+      fileTooLarge: "{{fileName}} is too large (max {{size}})",
     },
     clientCommands: {
       archiveAgent: "أرشفة الوكيل الحالي",
@@ -201,7 +206,7 @@ export const ar: TranslationResources = {
     },
   },
   sessions: {
-    title: "الجلسات",
+    title: "سجل الوكلاء",
     empty: "لا توجد جلسات بعد",
     actions: {
       loadMore: "تحميل المزيد",
@@ -250,9 +255,12 @@ export const ar: TranslationResources = {
       imageUnavailable: "الصورة غير متاحة",
       imagePreviewUnavailable: "معاينة الصورة غير متاحة.",
       imagePreviewLoadFailed: "غير قادر على تحميل معاينة الصورة.",
-      reviewOne: "مراجعة · تعليق واحد",
-      reviewMany: "مراجعة · تعليقات{{count}}",
+      review: "مراجعة",
+      commentsOne: "تعليق واحد",
+      commentsMany: "{{count}} تعليقات",
       textAttachment: "مرفق النص",
+      text: "نص",
+      file: "ملف",
     },
     speak: {
       header: "تكلم",
@@ -347,9 +355,12 @@ export const ar: TranslationResources = {
         retry: "أعد المحاولة",
         refresh: "تحديث الملفات",
         refreshing: "تحديث الملفات",
+        hideHiddenFiles: "إخفاء الملفات المخفية",
+        showHiddenFiles: "إظهار الملفات المخفية",
       },
       empty: {
         noFiles: "لا توجد ملفات",
+        noVisibleFiles: "لا توجد ملفات مرئية",
       },
       states: {
         unavailable: "Workspace غير متوفر",
@@ -416,7 +427,7 @@ export const ar: TranslationResources = {
       loadingAgentTitle: "جارٍ تحميل عنوان الوكيل",
       emptyPane: "لا توجد علامات تبويب في هذا الجزء.",
       fallback: {
-        newAgent: "جديد Agent",
+        newAgent: "وكيل جديد",
         setup: "يثبت",
         workspaceSetup: "إعداد Workspace",
         terminal: "Terminal",
@@ -433,6 +444,7 @@ export const ar: TranslationResources = {
         openFor: "فتح القائمة لـ{{label}}",
         copyResumeCommand: "نسخ أمر السيرة الذاتية",
         copyAgentId: "نسخ معرف الوكيل",
+        copyFilePath: "Copy file path",
         rename: "إعادة تسمية",
         closeAbove: "إغلاق علامات التبويب أعلاه",
         closeBelow: "إغلاق علامات التبويب أدناه",
@@ -446,13 +458,17 @@ export const ar: TranslationResources = {
         renameAgent: "إعادة تسمية الوكيل",
       },
       actions: {
-        newAgent: "علامة تبويب الوكيل الجديد",
-        newTerminal: "علامة تبويب طرفية جديدة",
+        newAgent: "وكيل جديد",
+        newTerminal: "محطة جديدة",
         preparingTerminal: "إعداد علامة التبويب المحطة الطرفية",
         preparingTerminalTooltip: "جارٍ تحضير المحطة...",
-        newBrowser: "علامة تبويب متصفح جديدة",
+        newBrowser: "متصفح جديد",
         splitRight: "تقسيم الجزء الأيمن",
         splitDown: "تقسيم الجزء لأسفل",
+        terminalProfilesMenu: "Terminal profiles",
+        editTerminalProfiles: "Edit profiles…",
+        pinTarget: "تثبيت",
+        unpinTarget: "إلغاء التثبيت",
       },
       explorer: {
         open: "افتح المستكشف",
@@ -465,6 +481,7 @@ export const ar: TranslationResources = {
         copyFailed: "فشل النسخ",
         agentIdCopiedLabel: "AgentID",
         resumeCommandCopiedLabel: "أمر الاستئناف",
+        filePathCopiedLabel: "File path",
         resumeIdUnavailable: "السيرة الذاتية ID غير متوفرة",
         resumeCommandUnavailable: "أمر الاستئناف غير متوفر",
         reloadingAgent: "وكيل إعادة التحميل...",
@@ -581,16 +598,16 @@ export const ar: TranslationResources = {
           success: "مؤرشف",
         },
         mergePr: {
-          squash: "الاسكواش والاندماج",
-          merge: "إنشاء التزام الدمج",
-          rebase: "إعادة الأساس والدمج",
+          squash: "دمج",
+          merge: "دمج",
+          rebase: "دمج",
           pending: "دمج PR...",
           success: "تم دمج PR",
         },
         autoMerge: {
-          enableSquash: "تمكين الدمج التلقائي مع الاسكواش",
-          enableMerge: "تمكين الدمج التلقائي مع التزام الدمج",
-          enableRebase: "تمكين الدمج التلقائي مع rebase",
+          enableSquash: "دمج تلقائي",
+          enableMerge: "دمج تلقائي",
+          enableRebase: "دمج تلقائي",
           enabled: "تم تمكين الدمج التلقائي",
           enabling: "تمكين الدمج التلقائي...",
           disabling: "تعطيل الدمج التلقائي...",
@@ -731,12 +748,13 @@ export const ar: TranslationResources = {
     },
     actions: {
       addProject: "إضافة مشروع",
+      newWorkspace: "مساحة عمل جديدة",
       home: "بيت",
       settings: "إعدادات",
       closeSidebar: "إغلاق الشريط الجانبي",
     },
     sections: {
-      sessions: "الجلسات",
+      sessions: "السجل",
     },
     worktreeSetup: {
       title: "إعداد البرامج النصية لشجرة العمل",
@@ -794,6 +812,12 @@ export const ar: TranslationResources = {
         hideConfirm: "يخفي",
         cancel: "يلغي",
       },
+      deleteWorktreePrompt: {
+        title: "أرشفة مساحة العمل",
+        message: "هل تريد أيضًا إزالة شجرة العمل من القرص؟",
+        keep: "الاحتفاظ على القرص",
+        delete: "حذف",
+      },
       rename: {
         title: "إعادة تسمية مساحة العمل",
         submit: "إعادة تسمية",
@@ -812,6 +836,17 @@ export const ar: TranslationResources = {
   newWorkspace: {
     title: "مساحة عمل جديدة",
     create: "يخلق",
+    backing: {
+      local: "محلي",
+      worktree: "شجرة عمل جديدة",
+      label: "العزل",
+    },
+    fields: {
+      project: "المشروع",
+      base: "الأساس",
+      baseNotApplicable: "غير قابل للتطبيق",
+    },
+    titlePlaceholder: "العنوان (اختياري)",
     errors: {
       hostDisconnected: "Host غير متصل",
       createWorktreeFailed: "فشل في إنشاء شجرة العمل",
@@ -1016,6 +1051,11 @@ export const ar: TranslationResources = {
     placeholder: "اكتب مسار الدليل...",
     opening: "افتتاح المشروع...",
     empty: "ابدأ بكتابة المسار",
+    errors: {
+      directory_not_found: "لم يتم العثور على الدليل.",
+      open_failed: "تعذر فتح المشروع.",
+    },
+    openPath: "فتح المسار",
   },
   branchSwitcher: {
     currentBranch: "الفرع الحالي:{{branchName}}. اضغط لتبديل الفرع.",
@@ -1271,11 +1311,11 @@ export const ar: TranslationResources = {
   },
   panels: {
     draft: {
-      newAgent: "جديد Agent",
+      newAgent: "وكيل جديد",
       creatingAgent: "وكيل الخلق",
     },
     file: {
-      executionDirectoryMissing: "لم يتم العثور على دليل تنفيذ Workspace.",
+      directoryMissing: "لم يتم العثور على دليل Workspace.",
       loading: "جارٍ تحميل الملف...",
       noPreview: "لا تتوفر معاينة",
       binaryPreviewUnavailable: "المعاينة الثنائية غير متاحة",
@@ -1292,7 +1332,7 @@ export const ar: TranslationResources = {
   },
   renameModal: {
     rename: "إعادة تسمية",
-    saving: "توفير...",
+    saving: "جارٍ الحفظ...",
   },
   sidebarCallout: {
     dismiss: "رفض",
@@ -1351,13 +1391,18 @@ export const ar: TranslationResources = {
       agents: "Agents",
       workspaces: "Workspaces",
       providers: "مقدمي الخدمات",
+      terminals: "Terminals",
       host: "Host",
     },
     general: {
       title: "عام",
       defaultSend: {
         label: "إرسال افتراضي",
-        description: "ماذا يحدث عند الضغط على Enter أثناء تشغيل الوكيل",
+        descriptions: {
+          interrupt:
+            "عند تشغيل الوكيل، يوقف Enter التشغيل. Command/Ctrl+Enter يضيف إلى قائمة الانتظار.",
+          queue: "عند تشغيل الوكيل، يضيف Enter إلى قائمة الانتظار. Command/Ctrl+Enter يرسل.",
+        },
         options: {
           interrupt: "مقاطعة",
           queue: "طابور",
@@ -1609,6 +1654,10 @@ export const ar: TranslationResources = {
           sheetTitle: "إلحاق موجه النظام",
           accessibilityLabel: "إلحاق موجه النظام",
           placeholder: "اجعل الردود موجزة دائمًا.",
+          edit: "تحرير",
+          reset: "إعادة ضبط",
+          save: "حفظ",
+          saving: "جارٍ الحفظ...",
         },
       },
       agents: {
@@ -1617,16 +1666,41 @@ export const ar: TranslationResources = {
       workspaces: {
         unavailable: "Connect to this host to manage workspaces",
       },
+      terminalProfiles: {
+        unavailable: "Connect to this host to manage terminal profiles",
+        sectionTitle: "Terminal profiles",
+        editProfile: "Edit profile",
+        addProfileTitle: "Add terminal profile",
+        editProfileTitle: "Edit terminal profile",
+        namePlaceholder: "Claude Code",
+        commandPlaceholder: "claude",
+        argsPlaceholder: "--dangerously-skip-permissions",
+        nameLabel: "Name",
+        commandLabel: "Command",
+        argsLabel: "Arguments",
+        nameRequired: "Name is required",
+        commandRequired: "Command is required",
+        argsHint: "Space-separated arguments passed to the command",
+        saving: "Saving...",
+        remove: "Remove",
+        removeConfirmTitle: "Remove profile?",
+        removeConfirmMessage: 'Remove "{{name}}"?',
+        moveUp: "Move up",
+        moveDown: "Move down",
+        save: "Save",
+        emptyState: "No profiles yet. Add one to launch terminals with a specific command.",
+      },
       daemon: {
         rename: {
           editLabel: "تحرير التسمية",
           title: "إعادة تسمية المضيف",
           placeholder: "بلدي Host",
+          submit: "إعادة تسمية",
         },
         restart: {
           title: "إعادة تشغيل البرنامج الخفي",
           hint: "إعادة تشغيل عملية البرنامج الخفي. سيتم إعادة الاتصال بالتطبيق تلقائيًا",
-          confirm: "إعادة تشغيل",
+          confirm: "إعادة التشغيل",
           confirmTitle: "أعد تشغيل{{name}}",
           confirmMessage:
             "سيؤدي هذا إلى إعادة تشغيل البرنامج الخفي. سيستمر العملاء الذين يعملون عليه؛ سيتم إعادة الاتصال بالتطبيق تلقائيًا.",
@@ -1792,9 +1866,9 @@ export const ar: TranslationResources = {
       actions: {
         reload: "إعادة تحميل",
         tryAgain: "حاول ثانية",
-        save: "يحفظ",
+        save: "حفظ",
         saved: "تم حفظ المشروع",
-        saving: "توفير...",
+        saving: "جارٍ الحفظ...",
         cancel: "يلغي",
       },
     },

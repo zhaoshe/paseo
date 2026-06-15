@@ -217,7 +217,6 @@ export async function migrateWorkspaceRegistry(
     const newCwd = to + cwd.slice(from.length);
     const migrated: PersistedWorkspaceRecord = {
       ...record,
-      workspaceId: newCwd,
       cwd: newCwd,
       // The directory now exists at the new path. Clear archivedAt so
       // workspaces archived by reconciliation (missing dir) resurface.
@@ -226,9 +225,6 @@ export async function migrateWorkspaceRegistry(
     };
     try {
       await registry.upsert(migrated);
-      if (record.workspaceId !== migrated.workspaceId) {
-        await registry.remove(record.workspaceId);
-      }
     } catch (err) {
       errors.push(`workspace ${record.workspaceId}: failed to migrate — ${String(err)}`);
     }

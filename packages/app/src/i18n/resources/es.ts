@@ -99,15 +99,18 @@ export const es: TranslationResources = {
     },
     attachments: {
       addImage: "Agregar imagen",
+      addFile: "Upload file",
       addIssueOrPr: "Agregar problema oPR",
       dropImagesHere: "Suelta imágenes aquí",
+      dropFilesHere: "Drop files here",
       editQueuedMessage: "Editar mensaje en cola",
       sendQueuedMessageNow: "Enviar mensaje en cola ahora",
       openImage: "Abrir imagen adjunta",
       removeImage: "Quitar imagen adjunta",
+      removeFile: "Remove file attachment",
       openGithub: "Abrir{{kind}}#{{number}}",
       removeGithub: "Quitar{{kind}}#{{number}}",
-      browserElement: "Elemento ·{{tag}}",
+      element: "Elemento",
       openBrowserElement: "Abrir archivo adjunto de elemento del navegador",
       removeBrowserElement: "Eliminar el archivo adjunto del elemento del navegador",
       openReview: "Abrir archivo adjunto de reseña",
@@ -119,6 +122,8 @@ export const es: TranslationResources = {
       noHostSelected: "Ningún anfitrión seleccionado",
       initialPromptRequired: "Se requiere aviso inicial",
       alreadyLoading: "Ya cargando",
+      uploadFailed: "Failed to upload file",
+      fileTooLarge: "{{fileName}} is too large (max {{size}})",
     },
     clientCommands: {
       archiveAgent: "Archivar el agente actual",
@@ -204,7 +209,7 @@ export const es: TranslationResources = {
     },
   },
   sessions: {
-    title: "Sesiones",
+    title: "Historial de agentes",
     empty: "Aún no hay sesiones",
     actions: {
       loadMore: "Cargar más",
@@ -253,9 +258,12 @@ export const es: TranslationResources = {
       imageUnavailable: "Imagen no disponible",
       imagePreviewUnavailable: "Vista previa de la imagen no disponible.",
       imagePreviewLoadFailed: "No se puede cargar la vista previa de la imagen.",
-      reviewOne: "Reseña · 1 comentario",
-      reviewMany: "Revisión · Comentarios{{count}}",
+      review: "Revisión",
+      commentsOne: "1 comentario",
+      commentsMany: "{{count}} comentarios",
       textAttachment: "Adjunto de texto",
+      text: "Texto",
+      file: "Archivo",
     },
     speak: {
       header: "Habló",
@@ -350,9 +358,12 @@ export const es: TranslationResources = {
         retry: "Rever",
         refresh: "Actualizar archivos",
         refreshing: "Actualizar archivos",
+        hideHiddenFiles: "Ocultar archivos ocultos",
+        showHiddenFiles: "Mostrar archivos ocultos",
       },
       empty: {
         noFiles: "Sin archivos",
+        noVisibleFiles: "No hay archivos visibles",
       },
       states: {
         unavailable: "Workspaceno está disponible",
@@ -419,7 +430,7 @@ export const es: TranslationResources = {
       loadingAgentTitle: "Título del agente de carga",
       emptyPane: "No hay pestañas en este panel.",
       fallback: {
-        newAgent: "NuevoAgent",
+        newAgent: "Nuevo agente",
         setup: "Configuración",
         workspaceSetup: "Configuración deWorkspace",
         terminal: "Terminal",
@@ -436,6 +447,7 @@ export const es: TranslationResources = {
         openFor: "Menú abierto para{{label}}",
         copyResumeCommand: "Copiar comando de reanudación",
         copyAgentId: "Copiar ID del agente",
+        copyFilePath: "Copy file path",
         rename: "Rebautizar",
         closeAbove: "Cerrar pestañas arriba",
         closeBelow: "Cerrar pestañas a continuación",
@@ -450,13 +462,17 @@ export const es: TranslationResources = {
         renameAgent: "Cambiar nombre del agente",
       },
       actions: {
-        newAgent: "Nueva pestaña de agente",
-        newTerminal: "Nueva pestaña de terminal",
+        newAgent: "Nuevo agente",
+        newTerminal: "Nueva terminal",
         preparingTerminal: "Preparando la pestaña del terminal",
         preparingTerminalTooltip: "Preparando terminal...",
-        newBrowser: "Nueva pestaña del navegador",
+        newBrowser: "Nuevo navegador",
         splitRight: "Panel dividido a la derecha",
         splitDown: "Dividir panel hacia abajo",
+        terminalProfilesMenu: "Terminal profiles",
+        editTerminalProfiles: "Edit profiles…",
+        pinTarget: "Fijar",
+        unpinTarget: "Desfijar",
       },
       explorer: {
         open: "Explorador abierto",
@@ -469,6 +485,7 @@ export const es: TranslationResources = {
         copyFailed: "Copia fallida",
         agentIdCopiedLabel: "AgentID",
         resumeCommandCopiedLabel: "reanudar el comando",
+        filePathCopiedLabel: "File path",
         resumeIdUnavailable: "ReanudarIDno disponible",
         resumeCommandUnavailable: "Comando de reanudación no disponible",
         reloadingAgent: "Agente de recarga...",
@@ -586,16 +603,16 @@ export const es: TranslationResources = {
           success: "Archivado",
         },
         mergePr: {
-          squash: "Aplastar y fusionar",
-          merge: "Crear una confirmación de fusión",
-          rebase: "Rebase y fusionar",
+          squash: "Fusionar",
+          merge: "Fusionar",
+          rebase: "Fusionar",
           pending: "FusionandoPR...",
           success: "PRfusionado",
         },
         autoMerge: {
-          enableSquash: "Habilitar la fusión automática con squash",
-          enableMerge: "Habilitar la fusión automática con confirmación de fusión",
-          enableRebase: "Habilitar la fusión automática con rebase",
+          enableSquash: "Fusión automática",
+          enableMerge: "Fusión automática",
+          enableRebase: "Fusión automática",
           enabled: "Combinación automática habilitada",
           enabling: "Habilitando la fusión automática...",
           disabling: "Desactivando la fusión automática...",
@@ -757,12 +774,13 @@ export const es: TranslationResources = {
     },
     actions: {
       addProject: "Agregar proyecto",
+      newWorkspace: "Nuevo espacio de trabajo",
       home: "Hogar",
       settings: "Ajustes",
       closeSidebar: "Cerrar barra lateral",
     },
     sections: {
-      sessions: "Sesiones",
+      sessions: "Historial",
     },
     worktreeSetup: {
       title: "Configurar secuencias de comandos del árbol de trabajo",
@@ -820,6 +838,12 @@ export const es: TranslationResources = {
         hideConfirm: "Esconder",
         cancel: "Cancelar",
       },
+      deleteWorktreePrompt: {
+        title: "Archivar espacio de trabajo",
+        message: "¿También eliminar el worktree del disco?",
+        keep: "Conservar en disco",
+        delete: "Eliminar",
+      },
       rename: {
         title: "Cambiar nombre del espacio de trabajo",
         submit: "Rebautizar",
@@ -838,6 +862,17 @@ export const es: TranslationResources = {
   newWorkspace: {
     title: "Nuevo espacio de trabajo",
     create: "Crear",
+    backing: {
+      local: "Local",
+      worktree: "Nuevo worktree",
+      label: "Aislamiento",
+    },
+    fields: {
+      project: "Proyecto",
+      base: "Base",
+      baseNotApplicable: "No aplicable",
+    },
+    titlePlaceholder: "Título (opcional)",
     errors: {
       hostDisconnected: "Hostno está conectado",
       createWorktreeFailed: "No se pudo crear el árbol de trabajo",
@@ -1048,6 +1083,11 @@ export const es: TranslationResources = {
     placeholder: "Escriba una ruta de directorio...",
     opening: "Proyecto de apertura...",
     empty: "Comience a escribir una ruta",
+    errors: {
+      directory_not_found: "No se encontró el directorio.",
+      open_failed: "No se pudo abrir el proyecto.",
+    },
+    openPath: "Abrir ruta",
   },
   branchSwitcher: {
     currentBranch: "Sucursal actual:{{branchName}}. Presione para cambiar de rama.",
@@ -1306,11 +1346,11 @@ export const es: TranslationResources = {
   },
   panels: {
     draft: {
-      newAgent: "NuevoAgent",
+      newAgent: "Nuevo agente",
       creatingAgent: "Agente creador",
     },
     file: {
-      executionDirectoryMissing: "No se encontró el directorio de ejecución deWorkspace.",
+      directoryMissing: "No se encontró el directorio de Workspace.",
       loading: "Cargando archivo...",
       noPreview: "No hay vista previa disponible",
       binaryPreviewUnavailable: "Vista previa binaria no disponible",
@@ -1327,7 +1367,7 @@ export const es: TranslationResources = {
   },
   renameModal: {
     rename: "Rebautizar",
-    saving: "Ahorro...",
+    saving: "Guardando...",
   },
   sidebarCallout: {
     dismiss: "Despedir",
@@ -1386,13 +1426,19 @@ export const es: TranslationResources = {
       agents: "Agents",
       workspaces: "Workspaces",
       providers: "Proveedores",
+      terminals: "Terminals",
       host: "Host",
     },
     general: {
       title: "General",
       defaultSend: {
         label: "Envío predeterminado",
-        description: "¿Qué sucede cuando presiona Enter mientras el agente se está ejecutando?",
+        descriptions: {
+          interrupt:
+            "Cuando el agente se está ejecutando, Enter interrumpe. Command/Ctrl+Enter pone en cola.",
+          queue:
+            "Cuando el agente se está ejecutando, Enter pone en cola. Command/Ctrl+Enter envía.",
+        },
         options: {
           interrupt: "Interrumpir",
           queue: "Cola",
@@ -1646,6 +1692,10 @@ export const es: TranslationResources = {
           sheetTitle: "Agregar mensaje del sistema",
           accessibilityLabel: "Agregar mensaje del sistema",
           placeholder: "Mantenga siempre respuestas concisas.",
+          edit: "Editar",
+          reset: "Restablecer",
+          save: "Guardar",
+          saving: "Guardando...",
         },
       },
       agents: {
@@ -1654,11 +1704,36 @@ export const es: TranslationResources = {
       workspaces: {
         unavailable: "Connect to this host to manage workspaces",
       },
+      terminalProfiles: {
+        unavailable: "Connect to this host to manage terminal profiles",
+        sectionTitle: "Terminal profiles",
+        editProfile: "Edit profile",
+        addProfileTitle: "Add terminal profile",
+        editProfileTitle: "Edit terminal profile",
+        namePlaceholder: "Claude Code",
+        commandPlaceholder: "claude",
+        argsPlaceholder: "--dangerously-skip-permissions",
+        nameLabel: "Name",
+        commandLabel: "Command",
+        argsLabel: "Arguments",
+        nameRequired: "Name is required",
+        commandRequired: "Command is required",
+        argsHint: "Space-separated arguments passed to the command",
+        saving: "Saving...",
+        remove: "Remove",
+        removeConfirmTitle: "Remove profile?",
+        removeConfirmMessage: 'Remove "{{name}}"?',
+        moveUp: "Move up",
+        moveDown: "Move down",
+        save: "Save",
+        emptyState: "No profiles yet. Add one to launch terminals with a specific command.",
+      },
       daemon: {
         rename: {
           editLabel: "Editar etiqueta",
           title: "Cambiar nombre de host",
           placeholder: "MiHost",
+          submit: "Cambiar nombre",
         },
         restart: {
           title: "Reiniciar demonio",
@@ -1833,9 +1908,9 @@ export const es: TranslationResources = {
       actions: {
         reload: "Recargar",
         tryAgain: "Intentar otra vez",
-        save: "Ahorrar",
+        save: "Guardar",
         saved: "Proyecto guardado",
-        saving: "Ahorro...",
+        saving: "Guardando...",
         cancel: "Cancelar",
       },
     },

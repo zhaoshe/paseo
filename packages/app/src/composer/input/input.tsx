@@ -54,7 +54,7 @@ import { useDismissKeyboardOnOpen } from "@/components/ui/keyboard-dismiss";
 import { useWebElementScrollbar } from "@/components/use-web-scrollbar";
 import { useShortcutKeys } from "@/hooks/use-shortcut-keys";
 import { useIosHardwareKeyboardSubmit } from "@/hooks/use-ios-hardware-keyboard-submit";
-import { formatShortcut } from "@/utils/format-shortcut";
+import { formatShortcut, type ShortcutKey } from "@/utils/format-shortcut";
 import { getShortcutOs } from "@/utils/shortcut-platform";
 import type { MessageInputKeyboardActionKind } from "@/keyboard/actions";
 import { isImeComposingKeyboardEvent } from "@/utils/keyboard-ime";
@@ -67,7 +67,9 @@ import {
   resolveVoiceAccessibilityLabel,
   resolveVoiceTooltipText,
 } from "./labels";
-import { computeCanStartDictation } from "./state";
+import { computeCanStartDictation, runAlternateSendAction, runDefaultSendAction } from "./state";
+
+const DEFAULT_SEND_KEYS: ShortcutKey[][] = [["Enter"]];
 
 export interface AttachmentMenuItem {
   id: string;
@@ -87,6 +89,8 @@ export interface MessageInputProps {
   allowEmptySubmit?: boolean;
   /** Optional accessibility label for the primary submit button. */
   submitButtonAccessibilityLabel?: string;
+  /** Optional testID for the primary submit button. */
+  submitButtonTestID?: string;
   submitIcon?: "arrow" | "return";
   isSubmitDisabled?: boolean;
   isSubmitLoading?: boolean;
@@ -782,6 +786,7 @@ function SendButtonTooltip({
   sendButtonCombinedStyle,
   isSubmitLoading,
   submitIcon,
+  submitButtonTestID,
   buttonIconSize,
   sendKeys,
   sendTooltipLabel,
@@ -795,6 +800,7 @@ function SendButtonTooltip({
   sendButtonCombinedStyle: React.ComponentProps<typeof TooltipTrigger>["style"];
   isSubmitLoading: boolean;
   submitIcon: "arrow" | "return";
+  submitButtonTestID: string | undefined;
   buttonIconSize: number;
   sendKeys: ShortcutChord | null | undefined;
   sendTooltipLabel: string;
@@ -807,6 +813,7 @@ function SendButtonTooltip({
         disabled={isSendButtonDisabled}
         accessibilityLabel={submitAccessibilityLabel}
         accessibilityRole="button"
+        testID={submitButtonTestID}
         style={sendButtonCombinedStyle}
       >
         <SendButtonContent
@@ -1123,32 +1130,6 @@ function computeSendButtonState(input: SendButtonStateInput): SendButtonStateOut
   return { canPressLoadingButton, isSendButtonDisabled, defaultActionQueues };
 }
 
-interface DefaultSendActionContext {
-  defaultSendBehavior: "interrupt" | "queue";
-  isAgentRunning: boolean;
-  onQueue: ((payload: MessagePayload) => void) | undefined;
-  handleSendMessage: () => void;
-  handleQueueMessage: () => void;
-}
-
-function runDefaultSendAction(ctx: DefaultSendActionContext): void {
-  if (ctx.defaultSendBehavior === "queue" && ctx.isAgentRunning && ctx.onQueue) {
-    ctx.handleQueueMessage();
-    return;
-  }
-  ctx.handleSendMessage();
-}
-
-function runAlternateSendAction(ctx: DefaultSendActionContext): void {
-  if (ctx.defaultSendBehavior === "queue") {
-    ctx.handleSendMessage();
-    return;
-  }
-  if (ctx.onQueue) {
-    ctx.handleQueueMessage();
-  }
-}
-
 interface ResolvedMessageInputProps {
   value: string;
   onChangeText: (text: string) => void;
@@ -1156,6 +1137,7 @@ interface ResolvedMessageInputProps {
   hasExternalContent: boolean;
   allowEmptySubmit: boolean;
   submitButtonAccessibilityLabel: string | undefined;
+  submitButtonTestID: string | undefined;
   submitIcon: "arrow" | "return";
   isSubmitDisabled: boolean;
   isSubmitLoading: boolean;
@@ -1196,6 +1178,7 @@ function resolveMessageInputProps(props: MessageInputProps): ResolvedMessageInpu
     hasExternalContent: props.hasExternalContent ?? false,
     allowEmptySubmit: props.allowEmptySubmit ?? false,
     submitButtonAccessibilityLabel: props.submitButtonAccessibilityLabel,
+    submitButtonTestID: props.submitButtonTestID,
     submitIcon: props.submitIcon ?? "arrow",
     isSubmitDisabled: props.isSubmitDisabled ?? false,
     isSubmitLoading: props.isSubmitLoading ?? false,
@@ -1244,6 +1227,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
       hasExternalContent,
       allowEmptySubmit,
       submitButtonAccessibilityLabel,
+      submitButtonTestID,
       submitIcon,
       isSubmitDisabled,
       isSubmitLoading,
@@ -1282,7 +1266,6 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
     const buttonIconSize = isWeb ? ICON_SIZE.md : ICON_SIZE.lg;
     const toast = useToast();
     const voice = useVoiceOptional();
-    const sendKeys = useShortcutKeys("message-input-send");
     const voiceMuteToggleKeys = useShortcutKeys("voice-mute-toggle");
     const dictationToggleKeys = useShortcutKeys("dictation-toggle");
     const focusInputKeys = useShortcutKeys("focus-message-input");
@@ -1897,8 +1880,9 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
                 sendButtonCombinedStyle={sendButtonCombinedStyle}
                 isSubmitLoading={isSubmitLoading}
                 submitIcon={submitIcon}
+                submitButtonTestID={submitButtonTestID}
                 buttonIconSize={buttonIconSize}
-                sendKeys={sendKeys}
+                sendKeys={DEFAULT_SEND_KEYS}
                 sendTooltipLabel={sendTooltipLabel}
               />
             </View>

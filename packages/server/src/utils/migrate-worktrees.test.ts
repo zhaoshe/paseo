@@ -174,9 +174,13 @@ describe("migrateWorkspaceRegistry", () => {
     return new FileBackedWorkspaceRegistry(filePath, silentLogger);
   }
 
-  function workspaceRecord(cwd: string, archivedAt: string | null = null) {
+  function workspaceRecord(
+    cwd: string,
+    archivedAt: string | null = null,
+    workspaceId = `wks_${cwd.split("/").at(-1)}`,
+  ) {
     return {
-      workspaceId: cwd,
+      workspaceId,
       projectId: "remote:github.com/org/repo",
       cwd,
       kind: "worktree" as const,
@@ -187,9 +191,9 @@ describe("migrateWorkspaceRegistry", () => {
     };
   }
 
-  it("repoints matching workspaces, clears archivedAt, and removes the old id", async () => {
+  it("repoints matching workspaces, clears archivedAt, and preserves the opaque id", async () => {
     const registry = buildRegistry([
-      workspaceRecord("/Users/old/worktrees/abc/proj", "2026-01-02T00:00:00.000Z"),
+      workspaceRecord("/Users/old/worktrees/abc/proj", "2026-01-02T00:00:00.000Z", "wks_opaque"),
       workspaceRecord("/Users/other/repo"),
     ]);
 
@@ -205,7 +209,7 @@ describe("migrateWorkspaceRegistry", () => {
 
     const migrated = records.find((r) => r.cwd === "/Users/new/worktrees/abc/proj");
     expect(migrated).toBeDefined();
-    expect(migrated?.workspaceId).toBe("/Users/new/worktrees/abc/proj");
+    expect(migrated?.workspaceId).toBe("wks_opaque");
     expect(migrated?.archivedAt).toBeNull();
     expect(records.find((r) => r.cwd === "/Users/old/worktrees/abc/proj")).toBeUndefined();
 

@@ -97,6 +97,7 @@ describe("DaemonConfigStore", () => {
         providers: {},
         metadataGeneration: { providers: [] },
         autoArchiveAfterMerge: false,
+        enableTerminalAgentHooks: false,
         appendSystemPrompt: "",
       },
       undefined,
@@ -128,6 +129,7 @@ describe("DaemonConfigStore", () => {
         providers: {},
         metadataGeneration: { providers: [] },
         autoArchiveAfterMerge: false,
+        enableTerminalAgentHooks: false,
         appendSystemPrompt: "",
       },
       undefined,
@@ -201,6 +203,7 @@ describe("DaemonConfigStore", () => {
         providers: {},
         metadataGeneration: { providers: [] },
         autoArchiveAfterMerge: false,
+        enableTerminalAgentHooks: false,
         appendSystemPrompt: "",
       },
       undefined,
@@ -241,6 +244,7 @@ describe("DaemonConfigStore", () => {
         providers: {},
         metadataGeneration: { providers: [] },
         autoArchiveAfterMerge: false,
+        enableTerminalAgentHooks: false,
         appendSystemPrompt: "",
       },
       undefined,
@@ -254,6 +258,29 @@ describe("DaemonConfigStore", () => {
     expect(persisted.daemon?.appendSystemPrompt).toBe("Prefer terse replies.");
   });
 
+  test("patch persists enable terminal agent hooks into config.json", () => {
+    const paseoHome = mkdtempSync(path.join(tmpdir(), "paseo-daemon-config-store-"));
+    tempDirs.push(paseoHome);
+
+    const store = new DaemonConfigStore(
+      paseoHome,
+      {
+        mcp: { injectIntoAgents: false },
+        providers: {},
+        metadataGeneration: { providers: [] },
+        autoArchiveAfterMerge: false,
+        enableTerminalAgentHooks: false,
+        appendSystemPrompt: "",
+      },
+      undefined,
+    );
+
+    store.patch({ enableTerminalAgentHooks: true });
+
+    const persisted = loadPersistedConfig(paseoHome);
+    expect(persisted.daemon?.enableTerminalAgentHooks).toBe(true);
+  });
+
   test("patch persists metadata generation providers into config.json", () => {
     const paseoHome = mkdtempSync(path.join(tmpdir(), "paseo-daemon-config-store-"));
     tempDirs.push(paseoHome);
@@ -265,6 +292,7 @@ describe("DaemonConfigStore", () => {
         providers: {},
         metadataGeneration: { providers: [] },
         autoArchiveAfterMerge: false,
+        enableTerminalAgentHooks: false,
         appendSystemPrompt: "",
       },
       undefined,
@@ -315,6 +343,7 @@ describe("DaemonConfigStore", () => {
         mcp: { injectIntoAgents: false },
         providers: {},
         autoArchiveAfterMerge: false,
+        enableTerminalAgentHooks: false,
         appendSystemPrompt: "",
         metadataGeneration: { providers: [{ provider: "claude", model: "haiku" }] },
       },
@@ -337,6 +366,7 @@ describe("DaemonConfigStore", () => {
         mcp: { injectIntoAgents: false },
         providers: {},
         autoArchiveAfterMerge: false,
+        enableTerminalAgentHooks: false,
         appendSystemPrompt: "",
         metadataGeneration: { providers: [] },
       },

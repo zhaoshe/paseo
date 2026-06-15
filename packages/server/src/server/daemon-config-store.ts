@@ -211,7 +211,11 @@ function mergeMutableConfigIntoPersistedConfig(params: {
         injectIntoAgents: mutable.mcp.injectIntoAgents,
       },
       autoArchiveAfterMerge: mutable.autoArchiveAfterMerge,
+      enableTerminalAgentHooks: mutable.enableTerminalAgentHooks,
       appendSystemPrompt: mutable.appendSystemPrompt,
+      ...(mutable.terminalProfiles !== undefined
+        ? { terminalProfiles: mutable.terminalProfiles }
+        : {}),
     },
     agents: nextAgents,
     // Empty root means "use the default" — drop the key so config.json stays clean

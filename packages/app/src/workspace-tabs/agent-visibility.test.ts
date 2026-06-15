@@ -10,6 +10,7 @@ import {
 function makeAgent(input: {
   id: string;
   cwd: string;
+  workspaceId?: string;
   parentAgentId?: string | null;
   archivedAt?: Date | null;
   createdAt?: Date;
@@ -44,6 +45,7 @@ function makeAgent(input: {
     },
     title: null,
     cwd: input.cwd,
+    workspaceId: input.workspaceId,
     model: null,
     thinkingOptionId: null,
     parentAgentId: input.parentAgentId ?? null,
@@ -230,14 +232,15 @@ describe("workspace agent visibility", () => {
         "slash-agent",
         makeAgent({
           id: "slash-agent",
-          cwd: "/Users/moboudra/.paseo/worktrees/1luy0po7/normal-squid/",
+          cwd: "/Users/moboudra/dev/paseo/.dev/paseo-home/worktrees/1luy0po7/normal-squid/",
         }),
       ],
     ]);
 
     const result = deriveWorkspaceAgentVisibility({
       sessionAgents,
-      workspaceDirectory: "/Users/moboudra/.paseo/worktrees/1luy0po7/normal-squid",
+      workspaceDirectory:
+        "/Users/moboudra/dev/paseo/.dev/paseo-home/worktrees/1luy0po7/normal-squid",
     });
 
     expect(result.activeAgentIds).toEqual(new Set(["slash-agent"]));
@@ -264,6 +267,65 @@ describe("workspace agent visibility", () => {
     expect(result.activeAgentIds).toEqual(new Set(["recent-agent"]));
     expect(result.autoOpenAgentIds).toEqual(new Set(["recent-agent"]));
     expect(result.knownAgentIds).toEqual(new Set(["recent-agent"]));
+  });
+
+  it("matches agents by workspaceId regardless of cwd", () => {
+    const sessionAgents = new Map<string, Agent>([
+      [
+        "stamped-agent",
+        makeAgent({
+          id: "stamped-agent",
+          cwd: "/repo/subdir",
+          workspaceId: "ws-1",
+        }),
+      ],
+    ]);
+
+    const result = deriveWorkspaceAgentVisibility({
+      sessionAgents,
+      workspaceId: "ws-1",
+      workspaceDirectory: "/repo/worktree",
+    });
+
+    expect(result.activeAgentIds).toEqual(new Set(["stamped-agent"]));
+    expect(result.knownAgentIds).toEqual(new Set(["stamped-agent"]));
+  });
+
+  it("excludes a stamped agent whose workspaceId belongs to another workspace sharing the cwd", () => {
+    const sessionAgents = new Map<string, Agent>([
+      [
+        "other-ws-agent",
+        makeAgent({
+          id: "other-ws-agent",
+          cwd: "/repo/worktree",
+          workspaceId: "ws-2",
+        }),
+      ],
+    ]);
+
+    const result = deriveWorkspaceAgentVisibility({
+      sessionAgents,
+      workspaceId: "ws-1",
+      workspaceDirectory: "/repo/worktree",
+    });
+
+    expect(result.activeAgentIds).toEqual(new Set<string>());
+    expect(result.knownAgentIds).toEqual(new Set<string>());
+  });
+
+  it("falls back to cwd matching for legacy agents without a workspaceId", () => {
+    const sessionAgents = new Map<string, Agent>([
+      ["legacy-agent", makeAgent({ id: "legacy-agent", cwd: "/repo/worktree" })],
+    ]);
+
+    const result = deriveWorkspaceAgentVisibility({
+      sessionAgents,
+      workspaceId: "ws-1",
+      workspaceDirectory: "/repo/worktree",
+    });
+
+    expect(result.activeAgentIds).toEqual(new Set(["legacy-agent"]));
+    expect(result.knownAgentIds).toEqual(new Set(["legacy-agent"]));
   });
 
   it("builds the tab reconciliation snapshot without callers unpacking agent visibility", () => {
